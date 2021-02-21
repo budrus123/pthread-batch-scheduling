@@ -36,6 +36,38 @@ int sjf();
 int fcfs();
 int priority();
 
+struct Job {
+	int id;
+	char *job_name;
+	int arrival_time;
+	int priority;
+	int cpu_time;
+	int finish_time;
+	// int wait_time; //Debate whether to add it
+	// int response_time; //Debate whether to add it
+
+};
+
+struct Workload_data {
+	int number_of_jobs;
+	float arrival_rate;
+	int min_cpu_time;
+	int max_cpu_time;
+};
+
+enum Policy { FCFS, SJF, PRIORITY };
+
+struct Perf_info {
+	int total_cpu_time;
+	int total_waiting_time;
+	int total_turnaround_time;
+	int total_number_of_jobs;
+	float throughput;
+	// Averages can be calculated from these
+};
+
+
+
 /*
  *  Command table.
  */
