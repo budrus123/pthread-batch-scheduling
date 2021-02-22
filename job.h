@@ -2,9 +2,9 @@
 #include <stdio.h>
 
 
-struct Job {
+struct job {
 	int id;
-	char *job_name;
+	char job_name [20];
 	int arrival_time;
 	int priority;
 	int cpu_time;

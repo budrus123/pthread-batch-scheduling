@@ -25,7 +25,7 @@
 #include <string.h>
 #include "command_line.h"
 #include "job.h"
-#include "job_queue.h"
+// #include "job_queue.h"
 
 /* Error Code */
 #define EINVAL       1
@@ -37,6 +37,7 @@
 int sjf();
 int fcfs();
 int priority();
+
 
 struct Workload_data {
 	int number_of_jobs;
@@ -57,7 +58,8 @@ struct Perf_info {
 };
 
 
-
+struct job job_queue;
+// int a[50];
 /*
  *  Command table.
  */
@@ -85,9 +87,9 @@ int fcfs(){
 	printf("First come first serve.\n");
 	struct Node* head = NULL;
 	// struct Node* head = NULL;
-	push(&head, 6);
-	push(&head, 6);
-	printf("%d\n", head->job->data);
+	// push(&head, 6);
+	// push(&head, 6);
+	// printf("%d\n", head->job->data);
 }
 
 int sjf(){
