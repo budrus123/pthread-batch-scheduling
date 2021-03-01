@@ -31,19 +31,6 @@
 #define MAXMENUARGS  4 
 #define MAXCMDLINE   64 
 
-/*
- * The run command - submit a job.
- */
-int cmd_run(int nargs, char **args) {
-	if (nargs != 4) {
-		printf("Usage: run <job> <time> <priority>\n");
-		return EINVAL;
-	}
-        
-        /* Use execv to run the submitted job in AUbatch */
-        printf("use execv to run the job in AUbatch.\n");
-      	return 0; /* if succeed */
-}
 
 /*
  * The quit command.
