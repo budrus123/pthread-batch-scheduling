@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include "command_line.h"
 #include "job.h"
+#include <time.h>
 // #include "job_queue.h"
 
 /* Error Code */
@@ -34,7 +35,7 @@
 
 #define MAXMENUARGS  4 
 #define MAXCMDLINE   64 
-#define JOB_BUF_SIZE 10
+#define JOB_BUF_SIZE 3
 
 int sjf();
 int fcfs();
@@ -42,6 +43,8 @@ int priority();
 
 void *sched_function( void *ptr ); 
 void *dispatch_function( void *ptr );  
+void print_job_info(struct job new_job);
+void execute_dummy();
 
 struct Workload_data {
 	int number_of_jobs;
@@ -63,6 +66,7 @@ struct Perf_info {
 
 
 struct job job_queue[JOB_BUF_SIZE];
+struct job new_job;
 int job_q_index_location = -1;
 
 // int a[50];
@@ -77,9 +81,9 @@ static struct {
 	{ "?\n",	cmd_helpmenu },
 	{ "h\n",	cmd_helpmenu },
 	{ "help\n",	cmd_helpmenu },
-	{ "r\n",	cmd_run },
-	{ "run\n",	cmd_run },
-	{ "list\n",	cmd_run },
+	{ "r",	cmd_run },
+	{ "run",	cmd_run },
+	{ "list",	cmd_run },
 	{ "fcfs\n",	fcfs },
 	{ "sjf\n",	sjf },
 	{ "priority\n",	priority },
@@ -113,21 +117,6 @@ int priority(){
 }
 
 /*
- * The run command - submit a job.
- */
-int cmd_run(int nargs, char **args) {
-	// if (nargs != 4) {
-	// 	printf("Usage: run <job> <time> <priority>\n");
-	// 	return EINVAL;
-	// }
-    job_q_index_location = 0;
-
-    /* Use execv to run the submitted job in AUbatch */
-    printf("use execv to run the job in AUbatch.\n");
-  	return 0; /* if succeed */
-}
-
-/*
  * Command line main loop.
  */
 pthread_mutex_t job_queue_lock;  /* Lock for critical sections */
@@ -135,63 +124,123 @@ pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
 pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
 
 
+int cmd_run(int nargs, char **args) {
+	if (nargs != 4) {
+		printf("Usage: run <job_name> <time> <priority>\n");
+		return EINVAL;
+	}
+	// pthread_mutex_lock(&job_queue_lock);
+
+	// job_q_index_location += 1;
+
+	// struct job new_job;
+	char* name = args[1];
+	float cpu_time = atof(args[2]);
+	int priority = atoi(args[3]);
+
+	strcpy(new_job.job_name, name);
+	new_job.cpu_time = cpu_time;
+	new_job.id = 17;
+	new_job.priority = priority;
+	new_job.finish_time = -1;
+	new_job.arrival_time = time(0);
+	// print_job_info(new_job);
+
+	// job_queue[job_q_index_location] = new_job;
+	// pthread_cond_signal(&job_buf_not_empty);
+	// pthread_mutex_unlock(&job_queue_lock);
+  	return 0; /* if succeed */
+}
+
+
 int main()
 {
 	struct Perf_info c;
 	char *buffer;
-    size_t bufsize = 64;
-    int  iret1, iret2;
-
+	size_t bufsize = 64;
+	int  iret1, iret2;
+	new_job.id = -1;
     pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
-   	iret1 = pthread_create(&sched_thread, NULL, sched_function, NULL);
-    iret2 = pthread_create(&dispatcher_thread, NULL, dispatch_function, NULL);
-    pthread_mutex_init(&job_queue_lock, NULL);
-    pthread_cond_init(&job_buf_not_full, NULL);
-    pthread_cond_init(&job_buf_not_empty, NULL);
+	iret1 = pthread_create(&sched_thread, NULL, sched_function, NULL);
+	iret2 = pthread_create(&dispatcher_thread, NULL, dispatch_function, NULL);
+
+	pthread_mutex_init(&job_queue_lock, NULL);
+	pthread_cond_init(&job_buf_not_full, NULL);
+	pthread_cond_init(&job_buf_not_empty, NULL);
 
     // pthread_join(sched_thread, NULL);
     // pthread_join(dispatcher_thread, NULL); 
 
-    buffer = (char*) malloc(bufsize * sizeof(char));
-    if (buffer == NULL) {
+	buffer = (char*) malloc(bufsize * sizeof(char));
+	if (buffer == NULL) {
 		perror("Unable to malloc buffer");
 		exit(1);
 	}
- 
-    while (1) {
+
+	while (1) {
 		printf("> [? for menu]: ");
 		getline(&buffer, &bufsize, stdin);
 		cmd_dispatch(buffer);
 	}
-        return 0;
+	return 0;
 }
 
 void *sched_function(void *ptr) {
+	// while(1) {
+	// 	printf("yolo\n");
+	// }
+	while (1) {
+		// printf("\nStarting Schedular\n");
+		// printf("%d ", job_q_index_location);
+		pthread_mutex_lock(&job_queue_lock);
+		while (job_q_index_location == JOB_BUF_SIZE) {
+			pthread_cond_wait(&job_buf_not_full, &job_queue_lock);
+		}
 
-	printf("\nStarting Schedular\n");
-    pthread_mutex_lock(&job_queue_lock);
-    while (job_q_index_location == JOB_BUF_SIZE) {
-        pthread_cond_wait(&job_buf_not_full, &job_queue_lock);
-    }
+		if (new_job.id != -1) {
+			printf("schedular: queue not empty, signaling not empty\n");
+			job_q_index_location += 1;
+			job_queue[job_q_index_location] = new_job;
+			new_job.id = -1;
+			pthread_cond_signal(&job_buf_not_empty);
+		}
+		// while (job_q_index_location == -1) {
+		// 	pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
+		// }
+		pthread_mutex_unlock(&job_queue_lock);
 
-    while (job_q_index_location == -1) {
+	}
 
-    }
-    printf("schedular: queue not full, signaling not empty\n");
-    pthread_cond_signal(&job_buf_not_empty);
-    pthread_mutex_unlock(&job_queue_lock);
 }
 
 void *dispatch_function(void *ptr) {
-	printf("\nStarting Dispatcher\n");
-	pthread_mutex_lock(&job_queue_lock);
-    while (job_q_index_location == -1) {
-        pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
-    }
+	while(1) {
+		// printf("\nStarting Dispatcher\n");
+		pthread_mutex_lock(&job_queue_lock);
+		while (job_q_index_location == -1) {
+			pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
+		}
+		print_job_info(job_queue[job_q_index_location]);
+		execute_dummy();
+  		
+		job_q_index_location -= 1;
+		printf("dispatcher: queue not empty\n");
+		pthread_cond_signal(&job_buf_not_full);
+		pthread_mutex_unlock(&job_queue_lock);
+	}
 
-    printf("dispatcher: queue not full, signaling not empty\n");
-    pthread_cond_signal(&job_buf_not_full);
-    pthread_mutex_unlock(&job_queue_lock);
+}
+
+void execute_dummy() {
+	char *my_args[5];
+  	pid_t pid;
+  
+  	my_args[0] = "./dummy";
+  	my_args[1] = "-help";
+  	my_args[2] = "-setup";
+  	my_args[3] = NULL;
+  	execv("./dummy", my_args);
+  	printf("fuck my life has finished\n");
 }
 
 
@@ -206,11 +255,11 @@ int cmd_dispatch(char *cmd)
 	int nargs=0;
 	char *word;
 	char *context;
- 	int i, result;
+	int i, result;
 
 	for (word = strtok_r(cmd, " ", &context);
-	     word != NULL;
-	     word = strtok_r(NULL, " ", &context)) {
+		word != NULL;
+		word = strtok_r(NULL, " ", &context)) {
 
 		if (nargs >= MAXMENUARGS) {
 			printf("Command line has too many words\n");
@@ -226,7 +275,7 @@ int cmd_dispatch(char *cmd)
 	for (i=0; cmdtable[i].name; i++) {
 		if (*cmdtable[i].name && !strcmp(args[0], cmdtable[i].name)) {
 			assert(cmdtable[i].func!=NULL);
-            
+
             /*Qin: Call function through the cmd_table */
 			result = cmdtable[i].func(nargs, args);
 			return result;
@@ -237,3 +286,13 @@ int cmd_dispatch(char *cmd)
 	return EINVAL;
 }
 
+void print_job_info(struct job new_job){
+
+	printf("\n\nPrinting job info:\n");
+	printf("name: %s\n",new_job.job_name);
+	printf("priority: %d\n",new_job.priority);
+	char* arrive_time = ctime(&new_job.arrival_time);
+	arrive_time[strlen(arrive_time)-1] = '\0';
+	printf("arrival time: %s\n",arrive_time);
+	printf("cpu time: %f\n\n\n",new_job.cpu_time);
+}
