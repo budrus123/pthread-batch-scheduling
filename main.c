@@ -37,6 +37,10 @@
 #define MAXCMDLINE   64 
 #define JOB_BUF_SIZE 3
 
+int head = 0;
+int tail = 0;
+
+
 int sjf();
 int fcfs();
 int priority();
@@ -45,6 +49,15 @@ void *sched_function( void *ptr );
 void *dispatch_function( void *ptr );  
 void print_job_info(struct job new_job);
 void execute_dummy();
+void *exec_thread_function(void *ptr);
+
+
+int queue_full();
+int get_next_position();
+
+struct job dequeue();
+
+struct job enqueue(struct job new_job);
 
 struct Workload_data {
 	int number_of_jobs;
@@ -193,14 +206,17 @@ void *sched_function(void *ptr) {
 		// printf("\nStarting Schedular\n");
 		// printf("%d ", job_q_index_location);
 		pthread_mutex_lock(&job_queue_lock);
-		while (job_q_index_location == JOB_BUF_SIZE) {
+		while (queue_full()) {
+			printf("Buffer full");
 			pthread_cond_wait(&job_buf_not_full, &job_queue_lock);
 		}
 
 		if (new_job.id != -1) {
-			printf("schedular: queue not empty, signaling not empty\n");
-			job_q_index_location += 1;
-			job_queue[job_q_index_location] = new_job;
+			enqueue(new_job);
+			printf("New job has been submitted\n");
+			printf("\nschedular: queue not empty, signaling not empty\n");
+			// job_q_index_location += 1;
+			// job_queue[job_q_index_location] = new_job;
 			new_job.id = -1;
 			pthread_cond_signal(&job_buf_not_empty);
 		}
@@ -217,18 +233,30 @@ void *dispatch_function(void *ptr) {
 	while(1) {
 		// printf("\nStarting Dispatcher\n");
 		pthread_mutex_lock(&job_queue_lock);
-		while (job_q_index_location == -1) {
+		while (queue_empty()) {
+			printf("queu empty: sleeping, dispatcher: \n");
 			pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
 		}
-		print_job_info(job_queue[job_q_index_location]);
-		execute_dummy();
-  		
-		job_q_index_location -= 1;
-		printf("dispatcher: queue not empty\n");
-		pthread_cond_signal(&job_buf_not_full);
+		printf("dispatcher dispatcher\n");
+		// pthread_mutex_lock(&job_queue_lock);
+		struct job first_job = dequeue();
 		pthread_mutex_unlock(&job_queue_lock);
+		pthread_t exec_thread; /* Two concurrent threads */
+		int th = pthread_create(&exec_thread, NULL, exec_thread_function, NULL);
+		pthread_join(exec_thread, NULL);
+		// print_job_info(first_job);
+		// pthread_mutex_unlock(&job_queue_lock);
+		// execute_dummy();
+		// job_q_index_location -= 1;
+		printf("\ndispatcher: queue not empty\n");
+		pthread_cond_signal(&job_buf_not_full);
 	}
 
+}
+
+void *exec_thread_function(void *ptr) {
+	sleep(10);
+	printf("job job job\n");
 }
 
 void execute_dummy() {
@@ -295,4 +323,36 @@ void print_job_info(struct job new_job){
 	arrive_time[strlen(arrive_time)-1] = '\0';
 	printf("arrival time: %s\n",arrive_time);
 	printf("cpu time: %f\n\n\n",new_job.cpu_time);
+	sleep(5);
+}
+
+int queue_empty() {
+	return head == tail;
+}
+
+int queue_full() {
+	int next_position = (head + 1) % JOB_BUF_SIZE;
+	// printf("next poisition is %d\n",next_position);
+	// printf("tail is %d\n",tail);
+	return next_position == tail;
+}
+
+int get_next_position() {
+	int next_position = (head + 1) % JOB_BUF_SIZE;
+	return next_position;
+}
+
+struct job dequeue() {
+	if (!queue_empty()) {
+		struct job tail_job = job_queue[tail];
+		tail = (tail + 1 ) % JOB_BUF_SIZE;
+	}
+}
+
+struct job enqueue(struct job new_job) {
+	if (!queue_full()) {
+		int next_position = get_next_position();
+		job_queue[next_position] = new_job;
+		head = next_position;
+	}
 }
