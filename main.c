@@ -1,22 +1,3 @@
-/*
- * COMP7500/7506
- * Project 3: commandline_parser.c
- *
- * This sample source code demonstrates how to:
- * (1) separate policies from a mechanism
- * (2) parse a commandline using getline() and strtok_r()
- * 
- * The sample code was derived from menu.c in the OS/161 project
- * 
- * Xiao Qin
- * Department of Computer Science and Software Engineering
- * Auburn University
- *
- * Compilation Instruction:
- * gcc commandline_parser.c -o commandline_parser
- * ./commandline_parser
- *
- */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -119,32 +100,22 @@ static struct {
 	{ "quit\n",	cmd_quit }
 };
 
-		// print_contents_of_queue();
-
-char ornela = 'o';
-
 int fcfs(){
-
+	printf("Changing policy to FCFS.\n");
 	policy = FCFS;
-	// struct Node* head = NULL;
-	// push(&head, 6);
-	// push(&head, 6);
-	// printf("%d\n", head->job->data);
 }
 
 int sjf(){
+	printf("Changing policy to SJF.\n");
 	policy = SJF;
-	printf("Shortest Job First.\n");
 }
 
 int priority(){
+	printf("Changing policy to Priority.\n");
 	policy = PRIORITY;
-	printf("Priority.\n");
 }
 
-/*
- * Command line main loop.
- */
+
 pthread_mutex_t job_queue_lock;  /* Lock for critical sections */
 pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
 pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
@@ -155,15 +126,12 @@ int list(int nargs, char **args) {
 }
 
 int cmd_run(int nargs, char **args) {
+
 	if (nargs != 4) {
 		printf("Usage: run <job_name> <time> <priority>\n");
 		return EINVAL;
 	}
-	// pthread_mutex_lock(&job_queue_lock);
 
-	// job_q_index_location += 1;
-
-	// struct job new_job;
 	char* name = args[1];
 	float cpu_time = atof(args[2]);
 	int priority = atoi(args[3]);
@@ -174,11 +142,6 @@ int cmd_run(int nargs, char **args) {
 	new_job.priority = priority;
 	new_job.finish_time = -1;
 	new_job.arrival_time = time(0);
-	// print_job_info(new_job);
-
-	// job_queue[job_q_index_location] = new_job;
-	// pthread_cond_signal(&job_buf_not_empty);
-	// pthread_mutex_unlock(&job_queue_lock);
   	return 0; /* if succeed */
 }
 
@@ -193,7 +156,9 @@ int main()
 	int  iret1, iret2;
 	new_job.id = -1;
     pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
+    printf("Starting Schedular....\n");
 	iret1 = pthread_create(&sched_thread, NULL, sched_function, NULL);
+	printf("Starting Dispatcher....\n");
 	iret2 = pthread_create(&dispatcher_thread, NULL, dispatch_function, NULL);
 
 	pthread_mutex_init(&job_queue_lock, NULL);
@@ -209,6 +174,9 @@ int main()
 		exit(1);
 	}
 
+	/*
+ 	* Command line main loop.
+ 	*/
 	while (1) {
 		printf("> [? for menu]: ");
 		getline(&buffer, &bufsize, stdin);
@@ -218,12 +186,8 @@ int main()
 }
 
 void *sched_function(void *ptr) {
-	// while(1) {
-	// 	printf("yolo\n");
-	// }
+
 	while (1) {
-		// printf("\nStarting Schedular\n");
-		// printf("%d ", job_q_index_location);
 		pthread_mutex_lock(&job_queue_lock);
 		while (queue_full()) {
 			printf("Buffer full");
@@ -255,7 +219,6 @@ void *sched_function(void *ptr) {
 
 void *dispatch_function(void *ptr) {
 	while(1) {
-		// printf("\nStarting Dispatcher\n");
 		pthread_mutex_lock(&job_queue_lock);
 		while (queue_empty()) {
 			printf("queu empty: sleeping, dispatcher: \n");
@@ -292,7 +255,6 @@ void print_contents_of_queue() {
 	int i = tail;
 	while (i < head) {
 		print_job_info(job_queue[i]);
-		// printf("job name %s\n", job_queue[i].job_name);
 		i++;
 	}
 }
