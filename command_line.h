@@ -36,6 +36,7 @@
  */
 int cmd_run(int nargs, char **args);
 
+int list(int nargs, char **args);
 /*
  * The quit command.
  */

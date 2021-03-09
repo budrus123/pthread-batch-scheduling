@@ -35,7 +35,7 @@
 
 #define MAXMENUARGS  4 
 #define MAXCMDLINE   64 
-#define JOB_BUF_SIZE 3
+#define JOB_BUF_SIZE 6
 
 int head = 0;
 int tail = 0;
@@ -45,12 +45,12 @@ int sjf();
 int fcfs();
 int priority();
 
+
 void *sched_function( void *ptr ); 
 void *dispatch_function( void *ptr );  
 void print_job_info(struct job new_job);
 void execute_dummy();
 void *exec_thread_function(void *ptr);
-
 
 int queue_full();
 int get_next_position();
@@ -66,7 +66,22 @@ struct Workload_data {
 	int max_cpu_time;
 };
 
-enum Policy { FCFS, SJF, PRIORITY };
+typedef enum { 
+	FCFS, 
+	SJF, 
+	PRIORITY, 
+	NONE
+} Policy;
+
+Policy policy = NONE;
+
+
+void change_queue_to_fcfs(struct job job[], int count);
+void change_queue_to_sjf(struct job job[], int count);
+void change_queue_to_priority(struct job job[], int count);
+void print_contents_of_queue();
+void change_policy(Policy policy);
+
 
 struct Perf_info {
 	int total_cpu_time;
@@ -96,7 +111,7 @@ static struct {
 	{ "help\n",	cmd_helpmenu },
 	{ "r",	cmd_run },
 	{ "run",	cmd_run },
-	{ "list",	cmd_run },
+	{ "list\n",	list },
 	{ "fcfs\n",	fcfs },
 	{ "sjf\n",	sjf },
 	{ "priority\n",	priority },
@@ -104,17 +119,13 @@ static struct {
 	{ "quit\n",	cmd_quit }
 };
 
+		// print_contents_of_queue();
+
 char ornela = 'o';
 
 int fcfs(){
 
-	printf("First come first serve.\n");
-	struct Node* head = NULL;
-	job_queue[0].id = 5;
-	// printf("%d\n", job_queue[0].id );
-
-
-	ornela = 's';
+	policy = FCFS;
 	// struct Node* head = NULL;
 	// push(&head, 6);
 	// push(&head, 6);
@@ -122,10 +133,12 @@ int fcfs(){
 }
 
 int sjf(){
+	policy = SJF;
 	printf("Shortest Job First.\n");
 }
 
 int priority(){
+	policy = PRIORITY;
 	printf("Priority.\n");
 }
 
@@ -136,6 +149,10 @@ pthread_mutex_t job_queue_lock;  /* Lock for critical sections */
 pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
 pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
 
+
+int list(int nargs, char **args) {
+	print_contents_of_queue();
+}
 
 int cmd_run(int nargs, char **args) {
 	if (nargs != 4) {
@@ -166,8 +183,10 @@ int cmd_run(int nargs, char **args) {
 }
 
 
+
 int main()
 {
+
 	struct Perf_info c;
 	char *buffer;
 	size_t bufsize = 64;
@@ -214,11 +233,16 @@ void *sched_function(void *ptr) {
 		if (new_job.id != -1) {
 			enqueue(new_job);
 			printf("New job has been submitted\n");
-			printf("\nschedular: queue not empty, signaling not empty\n");
+			// printf("\nschedular: queue not empty, signaling not empty\n");
 			// job_q_index_location += 1;
 			// job_queue[job_q_index_location] = new_job;
 			new_job.id = -1;
 			pthread_cond_signal(&job_buf_not_empty);
+		}
+		// print_contents_of_queue();
+		if (policy != NONE) {
+			change_policy(policy);
+			policy = NONE;
 		}
 		// while (job_q_index_location == -1) {
 		// 	pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
@@ -237,9 +261,16 @@ void *dispatch_function(void *ptr) {
 			printf("queu empty: sleeping, dispatcher: \n");
 			pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
 		}
-		printf("dispatcher dispatcher\n");
+
+		// printf("dispatcher dispatcher\n");
+
+
 		// pthread_mutex_lock(&job_queue_lock);
-		struct job first_job = dequeue();
+
+		// TODO: return this
+		// struct job first_job = dequeue();
+
+
 		pthread_mutex_unlock(&job_queue_lock);
 		pthread_t exec_thread; /* Two concurrent threads */
 		int th = pthread_create(&exec_thread, NULL, exec_thread_function, NULL);
@@ -248,14 +279,140 @@ void *dispatch_function(void *ptr) {
 		// pthread_mutex_unlock(&job_queue_lock);
 		// execute_dummy();
 		// job_q_index_location -= 1;
-		printf("\ndispatcher: queue not empty\n");
+
+
+		// printf("\ndispatcher: queue not empty\n");
 		pthread_cond_signal(&job_buf_not_full);
 	}
 
 }
 
+void print_contents_of_queue() {
+
+	int i = tail;
+	while (i < head) {
+		print_job_info(job_queue[i]);
+		// printf("job name %s\n", job_queue[i].job_name);
+		i++;
+	}
+}
+
+void change_policy(Policy policy) {
+	printf("changing mfing policy\n");
+	int elements_in_queue = get_count_elements_in_queue();
+	struct job temp_jobs [elements_in_queue];
+
+	int temp_tail = tail;
+	int temp_head = head;
+
+	int i = 0;
+	while (temp_tail < temp_head) {
+		temp_jobs[i] = job_queue[temp_tail];
+		temp_tail = (temp_tail + 1) % JOB_BUF_SIZE;
+		i++;
+	}
+
+	switch (policy){
+		case FCFS:
+		change_queue_to_fcfs(temp_jobs, elements_in_queue);
+		break;
+
+		case SJF:
+		change_queue_to_sjf(temp_jobs, elements_in_queue);
+		break;
+
+		case PRIORITY:
+		change_queue_to_priority(temp_jobs, elements_in_queue);
+		break;
+	}
+}
+
+void change_queue_to_fcfs(struct job temp_jobs[], int count) {
+
+	int i, j;
+	for (i = 0; i < count -1 ; i++) {
+		for (j=0; j < count-i-1; j++) {
+			if (temp_jobs[j].arrival_time > temp_jobs[j+1].arrival_time) {
+				//swapping
+				struct job temp = temp_jobs[j];
+				temp_jobs[j] = temp_jobs[j+1];
+				temp_jobs[j+1] = temp;
+			}
+		}
+	}
+
+	int temp_tail = tail;
+	int temp_head = head;
+
+	i = 0;
+	while (temp_tail < temp_head) {
+		job_queue[temp_tail] = temp_jobs[i];
+		temp_tail = (temp_tail + 1) % JOB_BUF_SIZE;
+		i++;
+	}
+}
+
+void change_queue_to_sjf(struct job temp_jobs[], int count) {
+	
+	int i, j;
+	for (i = 0; i < count -1 ; i++) {
+		for (j=0; j < count-i-1; j++) {
+			if (temp_jobs[j].cpu_time > temp_jobs[j+1].cpu_time) {
+				//swapping
+				struct job temp = temp_jobs[j];
+				temp_jobs[j] = temp_jobs[j+1];
+				temp_jobs[j+1] = temp;
+			}
+		}
+	}
+
+	int temp_tail = tail;
+	int temp_head = head;
+
+	i = 0;
+	while (temp_tail < temp_head) {
+		job_queue[temp_tail] = temp_jobs[i];
+		temp_tail = (temp_tail + 1) % JOB_BUF_SIZE;
+		i++;
+	}
+
+
+}
+
+void change_queue_to_priority(struct job temp_jobs[], int count) {
+	int i, j;
+	for (i = 0; i < count -1 ; i++) {
+		for (j=0; j < count-i-1; j++) {
+			if (temp_jobs[j].priority <temp_jobs[j+1].priority) {
+				//swapping
+				struct job temp = temp_jobs[j];
+				temp_jobs[j] = temp_jobs[j+1];
+				temp_jobs[j+1] = temp;
+			}
+		}
+	}
+
+	int temp_tail = tail;
+	int temp_head = head;
+
+	i = 0;
+	while (temp_tail < temp_head) {
+		job_queue[temp_tail] = temp_jobs[i];
+		temp_tail = (temp_tail + 1) % JOB_BUF_SIZE;
+		i++;
+	}
+}
+
+int get_count_elements_in_queue() {
+	if (head > tail) {
+		return head - tail;
+	} else {
+		return JOB_BUF_SIZE - (tail - head);
+	}
+}
+
 void *exec_thread_function(void *ptr) {
-	sleep(10);
+	sleep(40);
 	printf("job job job\n");
 }
 
@@ -316,14 +473,12 @@ int cmd_dispatch(char *cmd)
 
 void print_job_info(struct job new_job){
 
-	printf("\n\nPrinting job info:\n");
-	printf("name: %s\n",new_job.job_name);
-	printf("priority: %d\n",new_job.priority);
+	printf("Name: %s",new_job.job_name);
+	printf("\t   Piority: %d",new_job.priority);
 	char* arrive_time = ctime(&new_job.arrival_time);
 	arrive_time[strlen(arrive_time)-1] = '\0';
-	printf("arrival time: %s\n",arrive_time);
-	printf("cpu time: %f\n\n\n",new_job.cpu_time);
-	sleep(5);
+	printf("\tArrival: %s",arrive_time);
+	printf("\tCPU: %f\n",new_job.cpu_time);
 }
 
 int queue_empty() {
@@ -352,7 +507,7 @@ struct job dequeue() {
 struct job enqueue(struct job new_job) {
 	if (!queue_full()) {
 		int next_position = get_next_position();
-		job_queue[next_position] = new_job;
+		job_queue[head] = new_job;
 		head = next_position;
 	}
 }
