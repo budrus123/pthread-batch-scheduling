@@ -30,7 +30,7 @@ int priority();
 void *sched_function( void *ptr ); 
 void *dispatch_function( void *ptr );  
 void print_job_info(struct job new_job);
-void execute_dummy(struct job executing_job);
+void execute_job_process(struct job executing_job);
 void *exec_thread_function(void *ptr);
 
 int queue_full();
@@ -256,7 +256,7 @@ void *dispatch_function(void *ptr) {
 		  break;
 		case 0:
 		  /* This is processed by the child */
-		  execute_dummy(first_job);
+		  execute_job_process(first_job);
 		  puts("Uh oh! If this prints, execv() must have failed");
 		  exit(0);
 		  break;
@@ -268,7 +268,7 @@ void *dispatch_function(void *ptr) {
 	
 		// print_job_info(first_job);
 		// pthread_mutex_unlock(&job_queue_lock);
-		// execute_dummy();
+		// execute_job_process();
 		// job_q_index_location -= 1;
 
 
@@ -406,19 +406,20 @@ void *exec_thread_function(void *ptr) {
 	printf("job job job\n");
 }
 
-void execute_dummy(struct job executing_job) {
+void execute_job_process(struct job executing_job) {
 	print_job_info(executing_job);
 	float cpu_time = executing_job.cpu_time;
 	char float_in_string[10];
 	gcvt(cpu_time, 4, float_in_string);
-	printf("cput time strong is %s\n", float_in_string);
+	// printf("cput time strong is %s\n", float_in_string);
 	// // printf("need to execute for %f\n",);
 	// // printf("Name: %s",executing_job.job_name);
 	char *my_args[3];  
-  	my_args[0] = "./dummy";
+  	my_args[0] = "./job_process";
   	my_args[1] = float_in_string;
   	my_args[2] = NULL;
-  	execv("./dummy", my_args);
+  	execv("./job_process", my_args);
+
 }
 
 
