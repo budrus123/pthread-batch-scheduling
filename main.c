@@ -55,12 +55,12 @@ typedef enum {
 } Policy;
 
 Policy policy = NONE;
-int policy_change = -1;
+int policy_change = 0;
 
 void change_queue_to_fcfs(struct job job[], int count);
 void change_queue_to_sjf(struct job job[], int count);
 void change_queue_to_priority(struct job job[], int count);
-void print_contents_of_queue();
+void list_all_jobs();
 void update_policy(Policy policy);
 
 
@@ -75,8 +75,13 @@ struct Perf_info {
 
 
 struct job job_queue[JOB_BUF_SIZE];
+struct job completed_jobs[JOB_BUF_SIZE * 10];
+
 struct job new_job;
+struct job running_job;
+
 int job_q_index_location = -1;
+int completed_job_index = 0;
 
 // int a[50];
 /*
@@ -102,16 +107,19 @@ static struct {
 
 int fcfs(){
 	printf("Changing policy to FCFS.\n");
+	policy_change = 1;
 	policy = FCFS;
 }
 
 int sjf(){
 	printf("Changing policy to SJF.\n");
+	policy_change = 1;
 	policy = SJF;
 }
 
 int priority(){
 	printf("Changing policy to Priority.\n");
+	policy_change = 1;
 	policy = PRIORITY;
 }
 
@@ -122,7 +130,7 @@ pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
 
 
 int list(int nargs, char **args) {
-	print_contents_of_queue();
+	list_all_jobs();
 }
 
 int cmd_run(int nargs, char **args) {
@@ -150,7 +158,7 @@ int cmd_run(int nargs, char **args) {
 int main()
 {
 
-	policy_change = -1;
+	policy_change = 0;
 	struct Perf_info c;
 	char *buffer;
 	size_t bufsize = 64;
@@ -207,7 +215,7 @@ void *sched_function(void *ptr) {
 			new_job.id = -1;
 			pthread_cond_signal(&job_buf_not_empty);
 		}
-		// print_contents_of_queue();
+		// list_all_jobs();
 		if (policy_change != -1) {
 			update_policy(policy);
 			policy_change = -1;
@@ -237,8 +245,8 @@ void *dispatch_function(void *ptr) {
 
 		// TODO: return this
 		struct job first_job = dequeue();
-		printf("got %f\n",first_job.cpu_time);
-
+		// printf("got %f\n",first_job.cpu_time);
+		running_job = first_job;
 
 		pthread_mutex_unlock(&job_queue_lock);
 
@@ -263,6 +271,7 @@ void *dispatch_function(void *ptr) {
 		default:
 		  /* This is processed by the parent */
 		  wait(NULL);
+		  running_job.id = -1;
 		  break;
 		}
 	
@@ -278,17 +287,21 @@ void *dispatch_function(void *ptr) {
 
 }
 
-void print_contents_of_queue() {
-
+void list_all_jobs() {
+	printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
+	if (running_job.id != -1) {
+		print_job_info(running_job);
+		printf("\tRun\n");
+	}
 	int i = tail;
 	while (i < head) {
 		print_job_info(job_queue[i]);
+		printf("\n");
 		i++;
 	}
 }
 
 void update_policy(Policy policy) {
-	printf("changing mfing policy\n");
 	int elements_in_queue = get_count_elements_in_queue();
 	struct job temp_jobs [elements_in_queue];
 
@@ -467,12 +480,12 @@ int cmd_dispatch(char *cmd)
 
 void print_job_info(struct job new_job){
 
-	printf("Name: %s",new_job.job_name);
-	printf("\t   Piority: %d",new_job.priority);
+	printf("%s\t",new_job.job_name);
+	printf("%4.2f\t\t",new_job.cpu_time);
+	printf("%d\t",new_job.priority);
 	char* arrive_time = ctime(&new_job.arrival_time);
-	arrive_time[strlen(arrive_time)-1] = '\0';
-	printf("\tArrival: %s",arrive_time);
-	printf("\tCPU: %f\n",new_job.cpu_time);
+	arrive_time[strlen(arrive_time)-5] = '\0';
+	printf("%s",arrive_time+11);
 }
 
 int queue_empty() {
