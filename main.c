@@ -157,7 +157,7 @@ int cmd_run(int nargs, char **args) {
 
 int main()
 {
-
+	running_job.id = -1;
 	policy_change = 0;
 	struct Perf_info c;
 	char *buffer;
@@ -288,16 +288,21 @@ void *dispatch_function(void *ptr) {
 }
 
 void list_all_jobs() {
-	printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
-	if (running_job.id != -1) {
-		print_job_info(running_job);
-		printf("\tRun\n");
+	if (!queue_empty() || running_job.id != -1) {
+		printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
+		if (running_job.id != -1) {
+			print_job_info(running_job);
+			printf("\tRun\n");
+		}
+		int i = tail;
+		while (i < head) {
+			print_job_info(job_queue[i]);
+			printf("\n");
+			i++;
+		}
 	}
-	int i = tail;
-	while (i < head) {
-		print_job_info(job_queue[i]);
-		printf("\n");
-		i++;
+	else{
+		printf("No jobs pending execution.\n");
 	}
 }
 
