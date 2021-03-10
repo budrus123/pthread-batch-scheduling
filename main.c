@@ -30,7 +30,7 @@ int priority();
 void *sched_function( void *ptr ); 
 void *dispatch_function( void *ptr );  
 void print_job_info(struct job new_job);
-void execute_dummy();
+void execute_dummy(struct job executing_job);
 void *exec_thread_function(void *ptr);
 
 int queue_full();
@@ -236,13 +236,35 @@ void *dispatch_function(void *ptr) {
 		// pthread_mutex_lock(&job_queue_lock);
 
 		// TODO: return this
-		// struct job first_job = dequeue();
+		struct job first_job = dequeue();
+		printf("got %f\n",first_job.cpu_time);
 
 
 		pthread_mutex_unlock(&job_queue_lock);
-		pthread_t exec_thread; /* Two concurrent threads */
-		int th = pthread_create(&exec_thread, NULL, exec_thread_function, NULL);
-		pthread_join(exec_thread, NULL);
+
+		// pthread_t exec_thread; /* Two concurrent threads */
+		// int th = pthread_create(&exec_thread, NULL, exec_thread_function, NULL);
+		// pthread_join(exec_thread, NULL);
+
+		pid_t pid = fork();
+
+		switch (pid)
+		{
+		case -1:
+		  /* Fork() has failed */
+		  perror("fork");
+		  break;
+		case 0:
+		  /* This is processed by the child */
+		  execute_dummy(first_job);
+		  puts("Uh oh! If this prints, execv() must have failed");
+		  exit(0);
+		  break;
+		default:
+		  /* This is processed by the parent */
+		  wait(NULL);
+		  break;
+		}
 	
 		// print_job_info(first_job);
 		// pthread_mutex_unlock(&job_queue_lock);
@@ -384,16 +406,19 @@ void *exec_thread_function(void *ptr) {
 	printf("job job job\n");
 }
 
-void execute_dummy() {
-	char *my_args[5];
-  	pid_t pid;
-  
+void execute_dummy(struct job executing_job) {
+	print_job_info(executing_job);
+	float cpu_time = executing_job.cpu_time;
+	char float_in_string[10];
+	gcvt(cpu_time, 4, float_in_string);
+	printf("cput time strong is %s\n", float_in_string);
+	// // printf("need to execute for %f\n",);
+	// // printf("Name: %s",executing_job.job_name);
+	char *my_args[3];  
   	my_args[0] = "./dummy";
-  	my_args[1] = "-help";
-  	my_args[2] = "-setup";
-  	my_args[3] = NULL;
+  	my_args[1] = float_in_string;
+  	my_args[2] = NULL;
   	execv("./dummy", my_args);
-  	printf("fuck my life has finished\n");
 }
 
 
@@ -469,6 +494,7 @@ struct job dequeue() {
 	if (!queue_empty()) {
 		struct job tail_job = job_queue[tail];
 		tail = (tail + 1 ) % JOB_BUF_SIZE;
+		// print_job_info(tail_job);
 		return tail_job;
 	}
 }
