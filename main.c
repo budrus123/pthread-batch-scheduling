@@ -55,13 +55,13 @@ typedef enum {
 } Policy;
 
 Policy policy = NONE;
-
+int policy_change = -1;
 
 void change_queue_to_fcfs(struct job job[], int count);
 void change_queue_to_sjf(struct job job[], int count);
 void change_queue_to_priority(struct job job[], int count);
 void print_contents_of_queue();
-void change_policy(Policy policy);
+void update_policy(Policy policy);
 
 
 struct Perf_info {
@@ -150,6 +150,7 @@ int cmd_run(int nargs, char **args) {
 int main()
 {
 
+	policy_change = -1;
 	struct Perf_info c;
 	char *buffer;
 	size_t bufsize = 64;
@@ -197,6 +198,9 @@ void *sched_function(void *ptr) {
 		if (new_job.id != -1) {
 			enqueue(new_job);
 			printf("New job has been submitted\n");
+			if (policy != FCFS) {
+				update_policy(policy);
+			}
 			// printf("\nschedular: queue not empty, signaling not empty\n");
 			// job_q_index_location += 1;
 			// job_queue[job_q_index_location] = new_job;
@@ -204,9 +208,10 @@ void *sched_function(void *ptr) {
 			pthread_cond_signal(&job_buf_not_empty);
 		}
 		// print_contents_of_queue();
-		if (policy != NONE) {
-			change_policy(policy);
-			policy = NONE;
+		if (policy_change != -1) {
+			update_policy(policy);
+			policy_change = -1;
+			// policy = NONE;
 		}
 		// while (job_q_index_location == -1) {
 		// 	pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
@@ -221,7 +226,7 @@ void *dispatch_function(void *ptr) {
 	while(1) {
 		pthread_mutex_lock(&job_queue_lock);
 		while (queue_empty()) {
-			printf("queu empty: sleeping, dispatcher: \n");
+			// printf("queu empty: sleeping, dispatcher: \n");
 			pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
 		}
 
@@ -238,6 +243,7 @@ void *dispatch_function(void *ptr) {
 		pthread_t exec_thread; /* Two concurrent threads */
 		int th = pthread_create(&exec_thread, NULL, exec_thread_function, NULL);
 		pthread_join(exec_thread, NULL);
+	
 		// print_job_info(first_job);
 		// pthread_mutex_unlock(&job_queue_lock);
 		// execute_dummy();
@@ -259,7 +265,7 @@ void print_contents_of_queue() {
 	}
 }
 
-void change_policy(Policy policy) {
+void update_policy(Policy policy) {
 	printf("changing mfing policy\n");
 	int elements_in_queue = get_count_elements_in_queue();
 	struct job temp_jobs [elements_in_queue];
@@ -374,7 +380,7 @@ int get_count_elements_in_queue() {
 }
 
 void *exec_thread_function(void *ptr) {
-	sleep(40);
+	sleep(30);
 	printf("job job job\n");
 }
 
@@ -463,6 +469,7 @@ struct job dequeue() {
 	if (!queue_empty()) {
 		struct job tail_job = job_queue[tail];
 		tail = (tail + 1 ) % JOB_BUF_SIZE;
+		return tail_job;
 	}
 }
 
