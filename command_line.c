@@ -56,14 +56,15 @@ void showmenu(const char *name, const char *x[])
 }
 
 static const char *helpmenu[] = {
-	"[run] <job> <time> <priority>       ",
+	"[run]: <job> <time> <priority>       ",
 	"[list]: What the list does       ",
 	"[fcfs]: Something Something       ",
 	"[sjf]: Something Something       ",
 	"[priority]: Something Something       ",
-	"[test] <benchmark> <policy> <num_of_jobs> <priority_levels> <min_CPU_time> <max_CPU_time>",
-	"[quit] Exit AUbatch                 ",
-	"[help] Print help menu              ",
+	"[clear]: clear the screen       ",
+	"[test]: <benchmark> <policy> <num_of_jobs> <priority_levels> <min_CPU_time> <max_CPU_time>",
+	"[quit]: Exit AUbatch                 ",
+	"[help]: Print help menu              ",
         /* Please add more menu options below */
 	NULL
 };

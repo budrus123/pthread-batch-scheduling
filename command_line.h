@@ -23,7 +23,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
-#include <conio.h>
 
 /* Error Code */
 #define EINVAL       1
@@ -42,7 +41,8 @@ int list(int nargs, char **args);
  * The quit command.
  */
 int cmd_quit(int nargs, char **args);
-void clear_screen();
+int clear_screen();
+
 /*
  * Display menu information
  */

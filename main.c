@@ -8,6 +8,7 @@
 #include "command_line.h"
 #include "job.h"
 #include <time.h>
+
 // #include "job_queue.h"
 
 /* Error Code */
@@ -32,7 +33,7 @@ void *dispatch_function( void *ptr );
 void print_job_info(struct job new_job);
 void execute_job_process(struct job executing_job);
 void *exec_thread_function(void *ptr);
-void print_completed_jobs();
+void compute_performance_measures();
 int queue_full();
 int get_next_position();
 
@@ -104,36 +105,67 @@ static struct {
 	{ "fcfs\n",	fcfs },
 	{ "sjf\n",	sjf },
 	{ "priority\n",	priority },
-	{ "q\n",	cmd_quit },
-	{ "quit\n",	cmd_quit },
+	{ "q",	cmd_quit },
+	{ "quit",	cmd_quit },
 	{ "clear\n", clear_screen },
+	{NULL, NULL}
 
 };
 
 int fcfs(){
-	printf("Changing policy to FCFS.\n");
+	int count_queue = get_count_elements_in_queue();
+	printf("Scheduling policy is switched to FCFS." 
+		" All the %d waiting jobs have been rescheduled.\n", get_count_elements_in_queue());	
 	policy_change = 1;
 	policy = FCFS;
 }
 
 int sjf(){
-	printf("Changing policy to SJF.\n");
+	int count_queue = get_count_elements_in_queue();
+	printf("Scheduling policy is switched to SJF." 
+		" All the %d waiting jobs have been rescheduled.\n", get_count_elements_in_queue());	
 	policy_change = 1;
-	policy = SJF;
+	policy = FCFS;
 }
 
 int priority(){
-	printf("Changing policy to Priority.\n");
+	int count_queue = get_count_elements_in_queue();
+	printf("Scheduling policy is switched to Priority." 
+		" All the %d waiting jobs have been rescheduled.\n", get_count_elements_in_queue());	
 	policy_change = 1;
-	policy = PRIORITY;
+	policy = FCFS;
 }
 
 /*
  * The quit command.
  */
 int cmd_quit(int nargs, char **args) {
-	printf("Please display performance information before exiting AUbatch!\n");
-	print_completed_jobs();
+	if (nargs != 2) {
+		printf("Usage: %s -<quit_mode>\n", args[0]);
+		return EINVAL;
+	}
+	char* quit_type = args[1];
+	quit_type[strlen(quit_type)-1] = '\0';
+	if(strcmp(quit_type, "-i") == 0) {
+		printf("Quitting in immediate mode.\n");
+	} 
+	else if( strcmp(quit_type, "-d") == 0) {
+		if (get_count_elements_in_queue() > 0 || running_job.id != -1) {
+			printf("Pending completion of running programs...\n");
+		}
+		while(get_count_elements_in_queue() > 0 || running_job.id != -1) {
+		} 
+	}
+	else {
+		printf("Unsupported quitting mode [%s]\n", quit_type);
+		return 0;
+	}
+
+	printf("\n--------------------------------------------------------\n");
+	printf("\t\tPerformance info below\n");
+	printf("--------------------------------------------------------\n");
+	compute_performance_measures();
+	printf("\n");
     exit(0);
 }
 
@@ -182,9 +214,9 @@ int main()
 	int  iret1, iret2;
 	new_job.id = -1;
     pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
-    printf("Starting Schedular....\n");
+    printf("[Starting Schedular ]\n");
 	iret1 = pthread_create(&sched_thread, NULL, sched_function, NULL);
-	printf("Starting Dispatcher....\n");
+	printf("[Starting Dispatcher]\n");
 	iret2 = pthread_create(&dispatcher_thread, NULL, dispatch_function, NULL);
 
 	pthread_mutex_init(&job_queue_lock, NULL);
@@ -207,7 +239,7 @@ int main()
 		printf("> [? for menu]: ");
 		getline(&buffer, &bufsize, stdin);
 		cmd_dispatch(buffer);
-		usleep(50);
+		usleep(100);
 	}
 	return 0;
 }
@@ -369,23 +401,35 @@ void fill_job_details(struct job completed_job) {
 
 }
 
-void print_completed_jobs() {
+void compute_performance_measures() {
 
-	printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
+	if (completed_job_index == 0) {
+		printf("No jobs have completed, no info to display.\n");
+		return;
+	}
+	int total_number_of_jobs = completed_job_index;
+	double sum_turnaround, sum_cpu_time, sum_wait_time;
 	int i = 0;
 	while (i < completed_job_index) {
-		print_job_info(completed_jobs[i]);
-		printf("\n");
+		sum_turnaround += completed_jobs[i].turnaround_time;
+		sum_cpu_time += completed_jobs[i].cpu_time;
+		sum_wait_time += completed_jobs[i].wait_time;
 		i++;
 	}
+
+	printf("Total number of jobs submitted:\t%5.2f\n", (double)total_number_of_jobs);
+	printf("Average turnaround time:\t%5.2f\n", sum_turnaround/total_number_of_jobs);
+	printf("Average CPU time:\t\t%5.2f\n", sum_cpu_time/total_number_of_jobs);
+	printf("Average waiting time:\t\t%5.2f\n", sum_wait_time/total_number_of_jobs);
+
 }
 
 void list_all_jobs() {
 	printf("Total number of jobs in the queue: %d\n", get_count_elements_in_queue());
 	if (!queue_empty() || running_job.id != -1) {
-		printf("========================================================\n");
+		printf("--------------------------------------------------------\n");
 		printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
-		printf("========================================================\n");
+		printf("--------------------------------------------------------\n");
 		if (running_job.id != -1) {
 			print_job_info(running_job);
 			printf("\tRun\n");
@@ -552,7 +596,6 @@ int cmd_dispatch(char *cmd)
 	char *word;
 	char *context;
 	int i, result;
-
 	for (word = strtok_r(cmd, " ", &context);
 		word != NULL;
 		word = strtok_r(NULL, " ", &context)) {
@@ -563,7 +606,6 @@ int cmd_dispatch(char *cmd)
 		}
 		args[nargs++] = word;
 	}
-
 	if (nargs==0) {
 		return 0;
 	}
