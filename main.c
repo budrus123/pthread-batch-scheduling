@@ -32,7 +32,7 @@ void *dispatch_function( void *ptr );
 void print_job_info(struct job new_job);
 void execute_job_process(struct job executing_job);
 void *exec_thread_function(void *ptr);
-
+void print_completed_jobs();
 int queue_full();
 int get_next_position();
 
@@ -105,7 +105,9 @@ static struct {
 	{ "sjf\n",	sjf },
 	{ "priority\n",	priority },
 	{ "q\n",	cmd_quit },
-	{ "quit\n",	cmd_quit }
+	{ "quit\n",	cmd_quit },
+	{ "clear\n", clear_screen },
+
 };
 
 int fcfs(){
@@ -124,6 +126,15 @@ int priority(){
 	printf("Changing policy to Priority.\n");
 	policy_change = 1;
 	policy = PRIORITY;
+}
+
+/*
+ * The quit command.
+ */
+int cmd_quit(int nargs, char **args) {
+	printf("Please display performance information before exiting AUbatch!\n");
+	print_completed_jobs();
+    exit(0);
 }
 
 
@@ -164,6 +175,7 @@ int main()
 {
 	running_job.id = -1;
 	policy_change = 0;
+	policy = FCFS;
 	struct Perf_info c;
 	char *buffer;
 	size_t bufsize = 64;
@@ -195,6 +207,7 @@ int main()
 		printf("> [? for menu]: ");
 		getline(&buffer, &bufsize, stdin);
 		cmd_dispatch(buffer);
+		usleep(50);
 	}
 	return 0;
 }
@@ -219,7 +232,7 @@ void *sched_function(void *ptr) {
 			printf("Expected waiting time: %d\n", get_expected_wait_time());
 			printf("Scheduling policy: ");
 			print_policy();
-			printf("\n");
+			printf("\n\n");
 			// printf("\nschedular: queue not empty, signaling not empty\n");
 			// job_q_index_location += 1;
 			// job_queue[job_q_index_location] = new_job;
@@ -310,12 +323,13 @@ void *dispatch_function(void *ptr) {
 		  /* This is processed by the parent */
 		  wait(NULL);
 		  currently_executing = 0;
-		  printf("back in parent\n");
-		  print_job_info(first_job);
+		  // printf("back in parent\n");
+		  // print_job_info(first_job);
 		  // time_t raw_time;
 		  time(&running_job.finish_time);
 		  fill_job_details(running_job);
 		  running_job.id = -1;
+		  completed_jobs[completed_job_index++] = running_job;
 		  break;
 		}
 	
@@ -355,10 +369,23 @@ void fill_job_details(struct job completed_job) {
 
 }
 
+void print_completed_jobs() {
+
+	printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
+	int i = 0;
+	while (i < completed_job_index) {
+		print_job_info(completed_jobs[i]);
+		printf("\n");
+		i++;
+	}
+}
+
 void list_all_jobs() {
 	printf("Total number of jobs in the queue: %d\n", get_count_elements_in_queue());
 	if (!queue_empty() || running_job.id != -1) {
+		printf("========================================================\n");
 		printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
+		printf("========================================================\n");
 		if (running_job.id != -1) {
 			print_job_info(running_job);
 			printf("\tRun\n");
@@ -482,6 +509,8 @@ void change_queue_to_priority(struct job temp_jobs[], int count) {
 
 int get_count_elements_in_queue() {
 	// TODO: check this is working
+	if (queue_empty())
+		return 0;
 	if (head > tail) {
 		return head - tail;
 	} else {

@@ -33,14 +33,6 @@
 
 
 /*
- * The quit command.
- */
-int cmd_quit(int nargs, char **args) {
-	printf("Please display performance information before exiting AUbatch!\n");
-        exit(0);
-}
-
-/*
  * Display menu information
  */
 void showmenu(const char *name, const char *x[])
@@ -83,4 +75,8 @@ int cmd_helpmenu(int n, char **a)
 
 	showmenu("AUbatch help menu", helpmenu);
 	return 0;
+}
+
+void clear_screen() {
+	system("clear");
 }
