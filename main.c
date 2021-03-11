@@ -473,7 +473,7 @@ void change_queue_to_sjf(struct job temp_jobs[], int count) {
 	int i, j;
 	for (i = 0; i < count -1 ; i++) {
 		for (j=0; j < count-i-1; j++) {
-			if (temp_jobs[j].cpu_time > temp_jobs[j+1].cpu_time) {
+			if (temp_jobs[j].cpu_time < temp_jobs[j+1].cpu_time) {
 				//swapping
 				struct job temp = temp_jobs[j];
 				temp_jobs[j] = temp_jobs[j+1];
