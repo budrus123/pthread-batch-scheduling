@@ -58,6 +58,13 @@ typedef enum {
 Policy policy = NONE;
 int policy_change = 0;
 
+
+pthread_mutex_t job_queue_lock;  /* Lock for critical sections */
+pthread_mutex_t completed_job_queue_lock;  /* Lock for critical sections */
+pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
+pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
+
+
 void change_queue_to_fcfs(struct job job[], int count);
 void change_queue_to_sjf(struct job job[], int count);
 void change_queue_to_priority(struct job job[], int count);
@@ -113,27 +120,34 @@ static struct {
 };
 
 int fcfs(){
+	pthread_mutex_lock(&job_queue_lock);
 	int count_queue = get_count_elements_in_queue();
 	printf("Scheduling policy is switched to FCFS." 
-		" All the %d waiting jobs have been rescheduled.\n", get_count_elements_in_queue());	
+		" All the %d waiting jobs have been rescheduled.\n", count_queue);	
 	policy_change = 1;
 	policy = FCFS;
+	pthread_mutex_unlock(&job_queue_lock);
+
 }
 
 int sjf(){
+	pthread_mutex_lock(&job_queue_lock);
 	int count_queue = get_count_elements_in_queue();
 	printf("Scheduling policy is switched to SJF." 
-		" All the %d waiting jobs have been rescheduled.\n", get_count_elements_in_queue());	
+		" All the %d waiting jobs have been rescheduled.\n", count_queue);	
 	policy_change = 1;
-	policy = FCFS;
+	policy = SJF;
+	pthread_mutex_unlock(&job_queue_lock);
 }
 
 int priority(){
+	pthread_mutex_lock(&job_queue_lock);
 	int count_queue = get_count_elements_in_queue();
 	printf("Scheduling policy is switched to Priority." 
-		" All the %d waiting jobs have been rescheduled.\n", get_count_elements_in_queue());	
+		" All the %d waiting jobs have been rescheduled.\n", count_queue);	
 	policy_change = 1;
-	policy = FCFS;
+	policy = PRIORITY;
+	pthread_mutex_unlock(&job_queue_lock);
 }
 
 /*
@@ -150,7 +164,8 @@ int cmd_quit(int nargs, char **args) {
 		printf("Quitting in immediate mode.\n");
 	} 
 	else if( strcmp(quit_type, "-d") == 0) {
-		if (get_count_elements_in_queue() > 0 || running_job.id != -1) {
+		int count_queue = get_count_elements_in_queue();
+		if (count_queue > 0 || running_job.id != -1) {
 			printf("Pending completion of running programs...\n");
 		}
 		while(get_count_elements_in_queue() > 0 || running_job.id != -1) {
@@ -169,10 +184,6 @@ int cmd_quit(int nargs, char **args) {
     exit(0);
 }
 
-
-pthread_mutex_t job_queue_lock;  /* Lock for critical sections */
-pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
-pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
 
 
 int list(int nargs, char **args) {
@@ -206,7 +217,7 @@ int cmd_run(int nargs, char **args) {
 int main()
 {
 	running_job.id = -1;
-	policy_change = 0;
+	policy_change = -1;
 	policy = FCFS;
 	struct Perf_info c;
 	char *buffer;
@@ -220,6 +231,7 @@ int main()
 	iret2 = pthread_create(&dispatcher_thread, NULL, dispatch_function, NULL);
 
 	pthread_mutex_init(&job_queue_lock, NULL);
+	pthread_mutex_init(&completed_job_queue_lock, NULL);
 	pthread_cond_init(&job_buf_not_full, NULL);
 	pthread_cond_init(&job_buf_not_empty, NULL);
 
@@ -337,7 +349,9 @@ void *dispatch_function(void *ptr) {
 		  time(&running_job.finish_time);
 		  fill_job_details(running_job);
 		  running_job.id = -1;
+		  pthread_mutex_lock(&completed_job_queue_lock);
 		  completed_jobs[completed_job_index++] = running_job;
+		  pthread_mutex_unlock(&completed_job_queue_lock);
 		  break;
 		}
 		pthread_cond_signal(&job_buf_not_full);
@@ -370,7 +384,7 @@ void fill_job_details(struct job completed_job) {
 }
 
 void compute_performance_measures() {
-
+	pthread_mutex_lock(&completed_job_queue_lock);
 	if (completed_job_index == 0) {
 		printf("No jobs have completed, no info to display.\n");
 		return;
@@ -384,7 +398,7 @@ void compute_performance_measures() {
 		sum_wait_time += completed_jobs[i].wait_time;
 		i++;
 	}
-
+	pthread_mutex_unlock(&completed_job_queue_lock);
 	printf("Total number of jobs submitted:\t%5.2f\n", (double)total_number_of_jobs);
 	printf("Average turnaround time:\t%5.2f\n", sum_turnaround/total_number_of_jobs);
 	printf("Average CPU time:\t\t%5.2f\n", sum_cpu_time/total_number_of_jobs);
@@ -417,7 +431,7 @@ void list_all_jobs() {
 void update_policy(Policy policy) {
 	int elements_in_queue = get_count_elements_in_queue();
 	struct job temp_jobs [elements_in_queue];
-
+	printf("updateding pol %d\n",elements_in_queue);
 	int temp_tail = tail;
 	int temp_head = head;
 
@@ -473,7 +487,7 @@ void change_queue_to_sjf(struct job temp_jobs[], int count) {
 	int i, j;
 	for (i = 0; i < count -1 ; i++) {
 		for (j=0; j < count-i-1; j++) {
-			if (temp_jobs[j].cpu_time < temp_jobs[j+1].cpu_time) {
+			if (temp_jobs[j].cpu_time > temp_jobs[j+1].cpu_time) {
 				//swapping
 				struct job temp = temp_jobs[j];
 				temp_jobs[j] = temp_jobs[j+1];
