@@ -56,14 +56,14 @@ void showmenu(const char *name, const char *x[])
 }
 
 static const char *helpmenu[] = {
-	"[run]: <job> <time> <priority>       ",
-	"[list]: What the list does       ",
-	"[fcfs]: Something Something       ",
-	"[sjf]: Something Something       ",
-	"[priority]: Something Something       ",
+	"[run]: <name> <time> <priority>       ",
+	"[list]: List jobs in the queue       ",
+	"[fcfs]: Change scheduling policy to FCFS       ",
+	"[sjf]: Change scheduling policy to SJF       ",
+	"[priority]: Change scheduling policy to Priority       ",
 	"[clear]: clear the screen       ",
 	"[test]: <benchmark> <policy> <num_of_jobs> <priority_levels> <min_CPU_time> <max_CPU_time>",
-	"[quit]: Exit AUbatch                 ",
+	"[quit]: -<exit_mode>. Exit mode can be -i or -d                 ",
 	"[help]: Print help menu              ",
         /* Please add more menu options below */
 	NULL

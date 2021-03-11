@@ -249,7 +249,8 @@ void *sched_function(void *ptr) {
 	while (1) {
 		pthread_mutex_lock(&job_queue_lock);
 		while (queue_full()) {
-			printf("Buffer full");
+			printf("Buffer full: waiting for completion of other jobs.\n"
+				"Can't add any other jobs.");
 			pthread_cond_wait(&job_buf_not_full, &job_queue_lock);
 		}
 
@@ -258,28 +259,20 @@ void *sched_function(void *ptr) {
 			if (policy != FCFS) {
 				update_policy(policy);
 			}
-			printf("Job %s was submitted\n", new_job.job_name);
+			printf("\nJob %s was submitted\n", new_job.job_name);
 			int current_cpu_time = new_job.cpu_time;
 			printf("Total number of jobs in the queue: %d\n", get_count_elements_in_queue());
 			printf("Expected waiting time: %d\n", get_expected_wait_time());
 			printf("Scheduling policy: ");
 			print_policy();
 			printf("\n\n");
-			// printf("\nschedular: queue not empty, signaling not empty\n");
-			// job_q_index_location += 1;
-			// job_queue[job_q_index_location] = new_job;
 			new_job.id = -1;
 			pthread_cond_signal(&job_buf_not_empty);
 		}
-		// list_all_jobs();
 		if (policy_change != -1) {
 			update_policy(policy);
 			policy_change = -1;
-			// policy = NONE;
 		}
-		// while (job_q_index_location == -1) {
-		// 	pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
-		// }
 		pthread_mutex_unlock(&job_queue_lock);
 
 	}
@@ -316,27 +309,13 @@ void *dispatch_function(void *ptr) {
 	while(1) {
 		pthread_mutex_lock(&job_queue_lock);
 		while (queue_empty()) {
-			// printf("queu empty: sleeping, dispatcher: \n");
 			pthread_cond_wait(&job_buf_not_empty, &job_queue_lock);
 		}
-
-		// printf("dispatcher dispatcher\n");
-
-
-		// pthread_mutex_lock(&job_queue_lock);
-
-		// TODO: return this
 		struct job first_job = dequeue();
 		currently_executing = 1;
-		// printf("got %f\n",first_job.cpu_time);
 		running_job = first_job;
 
 		pthread_mutex_unlock(&job_queue_lock);
-
-		// pthread_t exec_thread; /* Two concurrent threads */
-		// int th = pthread_create(&exec_thread, NULL, exec_thread_function, NULL);
-		// pthread_join(exec_thread, NULL);
-
 		pid_t pid = fork();
 
 		switch (pid)
@@ -355,23 +334,12 @@ void *dispatch_function(void *ptr) {
 		  /* This is processed by the parent */
 		  wait(NULL);
 		  currently_executing = 0;
-		  // printf("back in parent\n");
-		  // print_job_info(first_job);
-		  // time_t raw_time;
 		  time(&running_job.finish_time);
 		  fill_job_details(running_job);
 		  running_job.id = -1;
 		  completed_jobs[completed_job_index++] = running_job;
 		  break;
 		}
-	
-		// print_job_info(first_job);
-		// pthread_mutex_unlock(&job_queue_lock);
-		// execute_job_process();
-		// job_q_index_location -= 1;
-
-
-		// printf("\ndispatcher: queue not empty\n");
 		pthread_cond_signal(&job_buf_not_full);
 	}
 
@@ -531,7 +499,7 @@ void change_queue_to_priority(struct job temp_jobs[], int count) {
 	int i, j;
 	for (i = 0; i < count -1 ; i++) {
 		for (j=0; j < count-i-1; j++) {
-			if (temp_jobs[j].priority <temp_jobs[j+1].priority) {
+			if (temp_jobs[j].priority < temp_jobs[j+1].priority) {
 				//swapping
 				struct job temp = temp_jobs[j];
 				temp_jobs[j] = temp_jobs[j+1];
@@ -552,7 +520,6 @@ void change_queue_to_priority(struct job temp_jobs[], int count) {
 }
 
 int get_count_elements_in_queue() {
-	// TODO: check this is working
 	if (queue_empty())
 		return 0;
 	if (head > tail) {
@@ -562,19 +529,12 @@ int get_count_elements_in_queue() {
 	}
 }
 
-void *exec_thread_function(void *ptr) {
-	sleep(30);
-	printf("job job job\n");
-}
 
 void execute_job_process(struct job executing_job) {
 	print_job_info(executing_job);
 	float cpu_time = executing_job.cpu_time;
 	char float_in_string[10];
 	gcvt(cpu_time, 4, float_in_string);
-	// printf("cput time strong is %s\n", float_in_string);
-	// // printf("need to execute for %f\n",);
-	// // printf("Name: %s",executing_job.job_name);
 	char *my_args[3];  
   	my_args[0] = "./job_process";
   	my_args[1] = float_in_string;
@@ -640,8 +600,6 @@ int queue_empty() {
 
 int queue_full() {
 	int next_position = (head + 1) % JOB_BUF_SIZE;
-	// printf("next poisition is %d\n",next_position);
-	// printf("tail is %d\n",tail);
 	return next_position == tail;
 }
 
@@ -654,7 +612,6 @@ struct job dequeue() {
 	if (!queue_empty()) {
 		struct job tail_job = job_queue[tail];
 		tail = (tail + 1 ) % JOB_BUF_SIZE;
-		// print_job_info(tail_job);
 		return tail_job;
 	}
 }
