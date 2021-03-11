@@ -16,7 +16,7 @@
 
 #define MAXMENUARGS  4 
 #define MAXCMDLINE   64 
-#define JOB_BUF_SIZE 6
+#define JOB_BUF_SIZE 10
 
 int head = 0;
 int tail = 0;
@@ -62,6 +62,9 @@ void change_queue_to_sjf(struct job job[], int count);
 void change_queue_to_priority(struct job job[], int count);
 void list_all_jobs();
 void update_policy(Policy policy);
+void fill_job_details(struct job completed_job);
+int get_expected_wait_time();
+void print_policy();
 
 
 struct Perf_info {
@@ -82,7 +85,7 @@ struct job running_job;
 
 int job_q_index_location = -1;
 int completed_job_index = 0;
-
+int currently_executing = 0;
 // int a[50];
 /*
  *  Command table.
@@ -148,8 +151,10 @@ int cmd_run(int nargs, char **args) {
 	new_job.cpu_time = cpu_time;
 	new_job.id = 17;
 	new_job.priority = priority;
-	new_job.finish_time = -1;
-	new_job.arrival_time = time(0);
+	time_t arrival;
+	time(&arrival);
+	// memcopy(new_job.arrival_time, arrival, sizeof(arrival));
+	new_job.arrival_time = arrival;
   	return 0; /* if succeed */
 }
 
@@ -205,10 +210,16 @@ void *sched_function(void *ptr) {
 
 		if (new_job.id != -1) {
 			enqueue(new_job);
-			printf("New job has been submitted\n");
 			if (policy != FCFS) {
 				update_policy(policy);
 			}
+			printf("Job %s was submitted\n", new_job.job_name);
+			int current_cpu_time = new_job.cpu_time;
+			printf("Total number of jobs in the queue: %d\n", get_count_elements_in_queue());
+			printf("Expected waiting time: %d\n", get_expected_wait_time());
+			printf("Scheduling policy: ");
+			print_policy();
+			printf("\n");
 			// printf("\nschedular: queue not empty, signaling not empty\n");
 			// job_q_index_location += 1;
 			// job_queue[job_q_index_location] = new_job;
@@ -229,6 +240,32 @@ void *sched_function(void *ptr) {
 	}
 
 }
+void print_policy() {
+	switch(policy) {
+		case FCFS:
+		printf("FCFS");
+		break;
+		case PRIORITY:
+		printf("PRIORITY");
+		break;
+		case SJF:
+		printf("SJF");
+		break;
+	}
+}
+
+int get_expected_wait_time() {
+	int expected_time = 0;
+
+	int i = tail;
+	while (i < head - 1) {
+		expected_time += (int) job_queue[i].cpu_time;
+		i++;
+	}
+	// TODO: Fix this
+	// expected_time += new_job.cpu_time;
+	return expected_time;
+}
 
 void *dispatch_function(void *ptr) {
 	while(1) {
@@ -245,6 +282,7 @@ void *dispatch_function(void *ptr) {
 
 		// TODO: return this
 		struct job first_job = dequeue();
+		currently_executing = 1;
 		// printf("got %f\n",first_job.cpu_time);
 		running_job = first_job;
 
@@ -271,6 +309,12 @@ void *dispatch_function(void *ptr) {
 		default:
 		  /* This is processed by the parent */
 		  wait(NULL);
+		  currently_executing = 0;
+		  printf("back in parent\n");
+		  print_job_info(first_job);
+		  // time_t raw_time;
+		  time(&running_job.finish_time);
+		  fill_job_details(running_job);
 		  running_job.id = -1;
 		  break;
 		}
@@ -287,7 +331,32 @@ void *dispatch_function(void *ptr) {
 
 }
 
+void fill_job_details(struct job completed_job) {
+
+	struct tm* timeinfo;
+	timeinfo = localtime(&completed_job.arrival_time);
+	// printf("local is %s\n",asctime(timeinfo) );
+
+	// printf("filling fillings\n");
+	char* arrive_time = ctime(&completed_job.arrival_time);
+	arrive_time[strlen(arrive_time)-1] = '\0';
+	// printf("Job arrived at: %s\n",arrive_time);
+
+	char* finish_time = ctime(&completed_job.finish_time);
+	finish_time[strlen(finish_time)-1] = '\0';
+	// printf("Job finished at: %s\n",finish_time);
+
+	double difference = difftime(completed_job.finish_time, completed_job.arrival_time);
+	completed_job.turnaround_time = difference;
+	completed_job.wait_time = completed_job.turnaround_time - completed_job.cpu_time;
+
+	// printf("turnaround_time time is: %f\n",completed_job.turnaround_time);
+	// printf("wait time is: %f\n",completed_job.wait_time);
+
+}
+
 void list_all_jobs() {
+	printf("Total number of jobs in the queue: %d\n", get_count_elements_in_queue());
 	if (!queue_empty() || running_job.id != -1) {
 		printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
 		if (running_job.id != -1) {
@@ -412,6 +481,7 @@ void change_queue_to_priority(struct job temp_jobs[], int count) {
 }
 
 int get_count_elements_in_queue() {
+	// TODO: check this is working
 	if (head > tail) {
 		return head - tail;
 	} else {
