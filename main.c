@@ -34,6 +34,7 @@ void print_job_info(struct job new_job);
 void execute_job_process(struct job executing_job);
 void *exec_thread_function(void *ptr);
 void compute_performance_measures();
+void print_performance_measures();
 int queue_full();
 int get_next_position();
 
@@ -61,6 +62,7 @@ int policy_change = 0;
 
 pthread_mutex_t job_queue_lock;  /* Lock for critical sections */
 pthread_mutex_t completed_job_queue_lock;  /* Lock for critical sections */
+pthread_mutex_t new_job_job_lock;  /* Lock for critical sections */
 pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
 pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
 
@@ -70,20 +72,23 @@ void change_queue_to_sjf(struct job job[], int count);
 void change_queue_to_priority(struct job job[], int count);
 void list_all_jobs();
 void update_policy(Policy policy);
-void fill_job_details(struct job completed_job);
+void fill_job_details(struct job* completed_job);
 int get_expected_wait_time();
 void print_policy();
 
 
 struct Perf_info {
-	int total_cpu_time;
-	int total_waiting_time;
-	int total_turnaround_time;
+	time_t program_start_time;
+	time_t program_end_time;
+	double total_cpu_time;
+	double total_waiting_time;
+	double total_turnaround_time;
 	int total_number_of_jobs;
-	float throughput;
+	double throughput;
 	// Averages can be calculated from these
 };
 
+struct Perf_info performance_metrics;
 
 struct job job_queue[JOB_BUF_SIZE];
 struct job completed_jobs[JOB_BUF_SIZE * 10];
@@ -176,10 +181,13 @@ int cmd_quit(int nargs, char **args) {
 		return 0;
 	}
 
+	time(&performance_metrics.program_end_time);
 	printf("\n--------------------------------------------------------\n");
 	printf("\t\tPerformance info below\n");
 	printf("--------------------------------------------------------\n");
+	performance_metrics.total_number_of_jobs = completed_job_index;
 	compute_performance_measures();
+	print_performance_measures();
 	printf("\n");
     exit(0);
 }
@@ -196,7 +204,7 @@ int cmd_run(int nargs, char **args) {
 		printf("Usage: run <job_name> <time> <priority>\n");
 		return EINVAL;
 	}
-
+	pthread_mutex_lock(&new_job_job_lock);
 	char* name = args[1];
 	float cpu_time = atof(args[2]);
 	int priority = atoi(args[3]);
@@ -209,6 +217,9 @@ int cmd_run(int nargs, char **args) {
 	time(&arrival);
 	// memcopy(new_job.arrival_time, arrival, sizeof(arrival));
 	new_job.arrival_time = arrival;
+	// printf("current time is %s\n",ctime(&new_job.arrival_time));
+	pthread_mutex_unlock(&new_job_job_lock);
+
   	return 0; /* if succeed */
 }
 
@@ -216,6 +227,7 @@ int cmd_run(int nargs, char **args) {
 
 int main()
 {
+	time(&performance_metrics.program_start_time);
 	running_job.id = -1;
 	policy_change = -1;
 	policy = FCFS;
@@ -231,6 +243,7 @@ int main()
 	iret2 = pthread_create(&dispatcher_thread, NULL, dispatch_function, NULL);
 
 	pthread_mutex_init(&job_queue_lock, NULL);
+	pthread_mutex_init(&new_job_job_lock, NULL);
 	pthread_mutex_init(&completed_job_queue_lock, NULL);
 	pthread_cond_init(&job_buf_not_full, NULL);
 	pthread_cond_init(&job_buf_not_empty, NULL);
@@ -251,7 +264,7 @@ int main()
 		printf("> [? for menu]: ");
 		getline(&buffer, &bufsize, stdin);
 		cmd_dispatch(buffer);
-		usleep(100);
+		usleep(1000);
 	}
 	return 0;
 }
@@ -265,26 +278,38 @@ void *sched_function(void *ptr) {
 				"Can't add any other jobs.");
 			pthread_cond_wait(&job_buf_not_full, &job_queue_lock);
 		}
-
+		pthread_mutex_lock(&new_job_job_lock);
 		if (new_job.id != -1) {
 			enqueue(new_job);
+			pthread_cond_signal(&job_buf_not_empty);		
+			pthread_mutex_unlock(&job_queue_lock);
 			if (policy != FCFS) {
+				pthread_mutex_lock(&job_queue_lock);
 				update_policy(policy);
+				pthread_mutex_unlock(&job_queue_lock);
 			}
 			printf("\nJob %s was submitted\n", new_job.job_name);
 			int current_cpu_time = new_job.cpu_time;
-			printf("Total number of jobs in the queue: %d\n", get_count_elements_in_queue());
+			int count_of_jobs = get_count_elements_in_queue();
+			printf("Total number of jobs in the queue: %d ", count_of_jobs);
+			if (currently_executing) {
+				printf("[1 running]\n");
+			} else{
+				printf("\n");
+			}
 			printf("Expected waiting time: %d\n", get_expected_wait_time());
 			printf("Scheduling policy: ");
 			print_policy();
 			printf("\n\n");
 			new_job.id = -1;
-			pthread_cond_signal(&job_buf_not_empty);
 		}
 		if (policy_change != -1) {
+			pthread_mutex_lock(&job_queue_lock);
 			update_policy(policy);
+			pthread_mutex_unlock(&job_queue_lock);
 			policy_change = -1;
 		}
+		pthread_mutex_unlock(&new_job_job_lock);
 		pthread_mutex_unlock(&job_queue_lock);
 
 	}
@@ -330,56 +355,72 @@ void *dispatch_function(void *ptr) {
 		pthread_mutex_unlock(&job_queue_lock);
 		pid_t pid = fork();
 
-		switch (pid)
-		{
+		switch (pid) {
 		case -1:
 		  /* Fork() has failed */
-		  perror("fork");
-		  break;
+			perror("fork");
+			break;
 		case 0:
 		  /* This is processed by the child */
-		  execute_job_process(first_job);
-		  puts("Uh oh! If this prints, execv() must have failed");
-		  exit(0);
-		  break;
-		default:
+			execute_job_process(first_job);
+			puts("Uh oh! If this prints, execv() must have failed");
+			exit(0);
+			break;
+		default:;
 		  /* This is processed by the parent */
-		  wait(NULL);
-		  currently_executing = 0;
-		  time(&running_job.finish_time);
-		  fill_job_details(running_job);
-		  running_job.id = -1;
-		  pthread_mutex_lock(&completed_job_queue_lock);
-		  completed_jobs[completed_job_index++] = running_job;
-		  pthread_mutex_unlock(&completed_job_queue_lock);
-		  break;
+			int return_status;
+			waitpid(pid, &return_status, 0);
+			// printf("job has finished\n");
+			currently_executing = 0;
+			time(&first_job.finish_time);
+			fill_job_details(&first_job);
+			running_job.id = -1;
+			pthread_mutex_lock(&completed_job_queue_lock);
+			completed_jobs[completed_job_index++] = first_job;
+
+			pthread_mutex_unlock(&completed_job_queue_lock);
+			break;
 		}
 		pthread_cond_signal(&job_buf_not_full);
 	}
 
 }
 
-void fill_job_details(struct job completed_job) {
+void fill_job_details(struct job* completed_job) {
 
-	struct tm* timeinfo;
-	timeinfo = localtime(&completed_job.arrival_time);
+	// struct tm* timeinfo;
+	// timeinfo = localtime(&completed_job.arrival_time);
 	// printf("local is %s\n",asctime(timeinfo) );
 
 	// printf("filling fillings\n");
-	char* arrive_time = ctime(&completed_job.arrival_time);
-	arrive_time[strlen(arrive_time)-1] = '\0';
+	// char* arrive_time = ctime(&completed_job.arrival_time);
+	// arrive_time[strlen(arrive_time)-1] = '\0';
 	// printf("Job arrived at: %s\n",arrive_time);
 
-	char* finish_time = ctime(&completed_job.finish_time);
-	finish_time[strlen(finish_time)-1] = '\0';
-	// printf("Job finished at: %s\n",finish_time);
+	// char* finish_time = ctime(&completed_job.finish_time);
+	// finish_time[strlen(finish_time)-1] = '\0';
+	// // printf("Job finished at: %s\n",finish_time);
 
-	double difference = difftime(completed_job.finish_time, completed_job.arrival_time);
-	completed_job.turnaround_time = difference;
-	completed_job.wait_time = completed_job.turnaround_time - completed_job.cpu_time;
+	double difference = difftime((*completed_job).finish_time, (*completed_job).arrival_time);
+	(*completed_job).turnaround_time = difference;
+	(*completed_job).wait_time = (*completed_job).turnaround_time - (*completed_job).cpu_time;
 
-	// printf("turnaround_time time is: %f\n",completed_job.turnaround_time);
-	// printf("wait time is: %f\n",completed_job.wait_time);
+	// printf("turnaround_time time is: %f\n",(*completed_job).turnaround_time);
+	// printf("wait time is: %f\n",(*completed_job).wait_time);
+
+}
+void print_performance_measures() {
+	int total_number_of_jobs = performance_metrics.total_number_of_jobs;
+
+	double average_ta = performance_metrics.total_turnaround_time / total_number_of_jobs;
+	double average_cpu = performance_metrics.total_cpu_time / total_number_of_jobs;
+	double average_wait = performance_metrics.total_waiting_time / total_number_of_jobs;
+	double throughput = performance_metrics.throughput;
+	printf("Total number of jobs submitted:\t%5.2f\n", (double)total_number_of_jobs);
+	printf("Average turnaround time:\t%5.2f\n", average_ta);
+	printf("Average CPU time:\t\t%5.2f\n", average_cpu);
+	printf("Average waiting time:\t\t%5.2f\n", average_wait);
+	printf("Throughput:\t\t\t%5.2f\n", throughput);
 
 }
 
@@ -389,25 +430,27 @@ void compute_performance_measures() {
 		printf("No jobs have completed, no info to display.\n");
 		return;
 	}
+
 	int total_number_of_jobs = completed_job_index;
 	double sum_turnaround, sum_cpu_time, sum_wait_time;
 	int i = 0;
 	while (i < completed_job_index) {
-		sum_turnaround += completed_jobs[i].turnaround_time;
-		sum_cpu_time += completed_jobs[i].cpu_time;
-		sum_wait_time += completed_jobs[i].wait_time;
+		performance_metrics.total_turnaround_time += completed_jobs[i].turnaround_time;
+		performance_metrics.total_cpu_time += completed_jobs[i].cpu_time;
+		performance_metrics.total_waiting_time += completed_jobs[i].wait_time;
 		i++;
 	}
+	time_t end_time = performance_metrics.program_end_time;
+	time_t start_time = performance_metrics.program_start_time;
+
+	performance_metrics.throughput = total_number_of_jobs / (difftime(end_time, start_time));
 	pthread_mutex_unlock(&completed_job_queue_lock);
-	printf("Total number of jobs submitted:\t%5.2f\n", (double)total_number_of_jobs);
-	printf("Average turnaround time:\t%5.2f\n", sum_turnaround/total_number_of_jobs);
-	printf("Average CPU time:\t\t%5.2f\n", sum_cpu_time/total_number_of_jobs);
-	printf("Average waiting time:\t\t%5.2f\n", sum_wait_time/total_number_of_jobs);
 
 }
 
 void list_all_jobs() {
-	printf("Total number of jobs in the queue: %d\n", get_count_elements_in_queue());
+	int count_of_jobs = get_count_elements_in_queue();
+	printf("Total number of jobs in the queue: %d\n", count_of_jobs);
 	if (!queue_empty() || running_job.id != -1) {
 		printf("--------------------------------------------------------\n");
 		printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
@@ -417,10 +460,12 @@ void list_all_jobs() {
 			printf("\tRun\n");
 		}
 		int i = tail;
-		while (i < head) {
+		int j = 0;
+		while (j < count_of_jobs) {
 			print_job_info(job_queue[i]);
 			printf("\n");
-			i++;
+			i = (i + 1) % JOB_BUF_SIZE;
+			j++;
 		}
 	}
 	else{
@@ -545,7 +590,8 @@ int get_count_elements_in_queue() {
 
 
 void execute_job_process(struct job executing_job) {
-	print_job_info(executing_job);
+	// printf("mahmoud\n");
+	// print_job_info(executing_job);
 	float cpu_time = executing_job.cpu_time;
 	char float_in_string[10];
 	gcvt(cpu_time, 4, float_in_string);
