@@ -13,3 +13,7 @@ struct job {
 	int response_time; //Debate whether to add it
 
 };
+
+void execute_job_process(struct job executing_job);
+
+void print_job_info(struct job new_job);

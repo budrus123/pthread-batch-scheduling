@@ -28,9 +28,6 @@
 #define EINVAL       1
 #define E2BIG        2
 
-#define MAXMENUARGS  4 
-#define MAXCMDLINE   64 
-
 /*
  * The run command - submit a job.
  */

@@ -74,7 +74,7 @@ int cmd_helpmenu(int n, char **a)
 	(void)n;
 	(void)a;
 
-	showmenu("AUbatch help menu", helpmenu);
+	showmenu("AUbatch help menu:", helpmenu);
 	return 0;
 }
 

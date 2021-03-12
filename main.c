@@ -1,4 +1,3 @@
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -6,32 +5,29 @@
 #include <string.h>
 #include <sys/types.h>
 #include "command_line.h"
-#include "job.h"
 #include <time.h>
+#include "job.h"
+#include "policy.h"
+#include "performance.h"
+#include "globals.h"
 
-// #include "job_queue.h"
+#define JOB_BUF_SIZE 20
+
 
 /* Error Code */
 #define EINVAL       1
 #define E2BIG        2
 
-#define MAXMENUARGS  4 
+#define MAXMENUARGS  7
 #define MAXCMDLINE   64 
-#define JOB_BUF_SIZE 10
-
-int head = 0;
-int tail = 0;
-
 
 int sjf();
 int fcfs();
 int priority();
-
+int test();
 
 void *sched_function( void *ptr ); 
 void *dispatch_function( void *ptr );  
-void print_job_info(struct job new_job);
-void execute_job_process(struct job executing_job);
 void *exec_thread_function(void *ptr);
 void compute_performance_measures();
 void print_performance_measures();
@@ -49,24 +45,7 @@ struct Workload_data {
 	int max_cpu_time;
 };
 
-typedef enum { 
-	FCFS, 
-	SJF, 
-	PRIORITY, 
-	NONE
-} Policy;
-
-Policy policy = NONE;
-int policy_change = 0;
-
-
-pthread_mutex_t job_queue_lock;  /* Lock for critical sections */
-pthread_mutex_t completed_job_queue_lock;  /* Lock for critical sections */
-pthread_mutex_t new_job_job_lock;  /* Lock for critical sections */
-pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
-pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
-
-
+int random_in_range(int low, int high);
 void change_queue_to_fcfs(struct job job[], int count);
 void change_queue_to_sjf(struct job job[], int count);
 void change_queue_to_priority(struct job job[], int count);
@@ -76,29 +55,6 @@ void fill_job_details(struct job* completed_job);
 int get_expected_wait_time();
 void print_policy();
 
-
-struct Perf_info {
-	time_t program_start_time;
-	time_t program_end_time;
-	double total_cpu_time;
-	double total_waiting_time;
-	double total_turnaround_time;
-	int total_number_of_jobs;
-	double throughput;
-	// Averages can be calculated from these
-};
-
-struct Perf_info performance_metrics;
-
-struct job job_queue[JOB_BUF_SIZE];
-struct job completed_jobs[JOB_BUF_SIZE * 10];
-
-struct job new_job;
-struct job running_job;
-
-int job_q_index_location = -1;
-int completed_job_index = 0;
-int currently_executing = 0;
 // int a[50];
 /*
  *  Command table.
@@ -113,6 +69,7 @@ static struct {
 	{ "help\n",	cmd_helpmenu },
 	{ "r",	cmd_run },
 	{ "run",	cmd_run },
+	{ "test",	test },
 	{ "list\n",	list },
 	{ "fcfs\n",	fcfs },
 	{ "sjf\n",	sjf },
@@ -198,6 +155,88 @@ int list(int nargs, char **args) {
 	list_all_jobs();
 }
 
+int test(int nargs, char **args) {
+	if (nargs != 7) {
+		printf("Usage: test <benchmark> <policy> <num_of_jobs> <priority_levels>\n"
+			"\t    <min_cpu_time> <max_cpu_time>\n");
+		return EINVAL;
+	}
+
+	// TODO: make sure to flush all queues
+	// and start from scratch if test is started
+	// with a non-empty state
+	test_mode = 1;
+
+	char* benchmark_name = args[1];
+
+	char* policy_string = args[2];
+	policy_string[strlen(policy_string)] = '\0';
+
+	if(strcmp(policy_string, "fcfs") == 0) {
+		policy = FCFS;
+	} else if(strcmp(policy_string, "sjf") == 0) {
+		policy = SJF;
+	} else if(strcmp(policy_string, "priority") == 0) {
+		policy = PRIORITY;
+	} else {
+		printf("Unsupported scheduling mode [%s]\n", policy_string);
+	}
+
+	time(&performance_metrics.program_start_time);
+	int num_of_jobs = atoi(args[3]);
+	int priority_levels = atoi(args[4]);
+	float min_cpu_time = atof(args[5]);
+	float max_cpu_time = atof(args[6]);
+	int i = 0;
+	for(i = 0; i < num_of_jobs; i++) {
+		char *my_args[4];  
+		int priority =random_in_range(1, priority_levels);
+		double cpu_time =random_in_range((int) min_cpu_time, (int) max_cpu_time);
+		char priority_string [5];
+		sprintf(priority_string, "%ld" , priority);
+
+		char float_in_string[10];
+		gcvt(cpu_time, 4, float_in_string);		
+	  	// my_args[1] = float_in_string;
+
+
+	  	my_args[0] = "run";
+	  	my_args[1] = "test_r";
+	  	my_args[2] = float_in_string;
+	  	my_args[3] = priority_string;
+		cmd_run(4, my_args);
+		// sleep(1);
+		usleep(1000);
+	}
+
+	printf("\n");
+	list_all_jobs();
+	int count_queue = get_count_elements_in_queue();
+	if (count_queue > 0 || running_job.id != -1) {
+		printf("\nPending completion of running programs...\n");
+	}
+	while(get_count_elements_in_queue() > 0 || running_job.id != -1) {
+	} 
+
+	time(&performance_metrics.program_end_time);
+	printf("\n--------------------------------------------------------\n");
+	printf("\t\tPerformance info below\n");
+	printf("--------------------------------------------------------\n");
+	performance_metrics.total_number_of_jobs = completed_job_index;
+	compute_performance_measures();
+	print_performance_measures();
+	printf("\n");
+    // exit(0);
+
+	test_mode = 0;
+}
+
+int random_in_range(int low, int high) {
+	int random = (rand() % (high - low + 1)) + 1;
+	return random; 
+}
+
+
 int cmd_run(int nargs, char **args) {
 
 	if (nargs != 4) {
@@ -227,6 +266,8 @@ int cmd_run(int nargs, char **args) {
 
 int main()
 {
+
+	srand(time(0));
 	time(&performance_metrics.program_start_time);
 	running_job.id = -1;
 	policy_change = -1;
@@ -265,6 +306,7 @@ int main()
 		getline(&buffer, &bufsize, stdin);
 		cmd_dispatch(buffer);
 		usleep(1000);
+		while (test_mode){}
 	}
 	return 0;
 }
@@ -288,25 +330,25 @@ void *sched_function(void *ptr) {
 				update_policy(policy);
 				pthread_mutex_unlock(&job_queue_lock);
 			}
-			printf("\nJob %s was submitted\n", new_job.job_name);
-			int current_cpu_time = new_job.cpu_time;
-			int count_of_jobs = get_count_elements_in_queue();
-			printf("Total number of jobs in the queue: %d ", count_of_jobs);
-			if (currently_executing) {
-				printf("[1 running]\n");
-			} else{
-				printf("\n");
+			if (!test_mode) {
+				printf("\nJob %s was submitted\n", new_job.job_name);
+				int current_cpu_time = new_job.cpu_time;
+				int count_of_jobs = get_count_elements_in_queue();
+				printf("Total number of jobs in the queue: %d ", count_of_jobs);
+				if (currently_executing) {
+					printf("[1 running]\n");
+				} else{
+					printf("\n");
+				}
+				printf("Expected waiting time: %d\n", get_expected_wait_time());
+				printf("Scheduling policy: ");
+				print_policy();
+				printf("\n\n");
 			}
-			printf("Expected waiting time: %d\n", get_expected_wait_time());
-			printf("Scheduling policy: ");
-			print_policy();
-			printf("\n\n");
 			new_job.id = -1;
 		}
 		if (policy_change != -1) {
-			pthread_mutex_lock(&job_queue_lock);
 			update_policy(policy);
-			pthread_mutex_unlock(&job_queue_lock);
 			policy_change = -1;
 		}
 		pthread_mutex_unlock(&new_job_job_lock);
@@ -337,8 +379,9 @@ int get_expected_wait_time() {
 		expected_time += (int) job_queue[i].cpu_time;
 		i++;
 	}
-	// TODO: Fix this
-	// expected_time += new_job.cpu_time;
+	if (currently_executing = 1) {
+		expected_time += running_job.cpu_time;
+	}
 	return expected_time;
 }
 
@@ -476,7 +519,6 @@ void list_all_jobs() {
 void update_policy(Policy policy) {
 	int elements_in_queue = get_count_elements_in_queue();
 	struct job temp_jobs [elements_in_queue];
-	printf("updateding pol %d\n",elements_in_queue);
 	int temp_tail = tail;
 	int temp_head = head;
 
@@ -588,22 +630,6 @@ int get_count_elements_in_queue() {
 	}
 }
 
-
-void execute_job_process(struct job executing_job) {
-	// printf("mahmoud\n");
-	// print_job_info(executing_job);
-	float cpu_time = executing_job.cpu_time;
-	char float_in_string[10];
-	gcvt(cpu_time, 4, float_in_string);
-	char *my_args[3];  
-  	my_args[0] = "./job_process";
-  	my_args[1] = float_in_string;
-  	my_args[2] = NULL;
-  	execv("./job_process", my_args);
-
-}
-
-
 /*
  * Process a single command.
  */
@@ -642,16 +668,6 @@ int cmd_dispatch(char *cmd)
 
 	printf("%s: Command not found\n", args[0]);
 	return EINVAL;
-}
-
-void print_job_info(struct job new_job){
-
-	printf("%s\t",new_job.job_name);
-	printf("%4.2f\t\t",new_job.cpu_time);
-	printf("%d\t",new_job.priority);
-	char* arrive_time = ctime(&new_job.arrival_time);
-	arrive_time[strlen(arrive_time)-5] = '\0';
-	printf("%s",arrive_time+11);
 }
 
 int queue_empty() {
