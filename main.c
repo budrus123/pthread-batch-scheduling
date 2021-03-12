@@ -180,6 +180,8 @@ int test(int nargs, char **args) {
 		policy = PRIORITY;
 	} else {
 		printf("Unsupported scheduling mode [%s]\n", policy_string);
+		test_mode = 0;
+		return -1;
 	}
 
 	time(&performance_metrics.program_start_time);
@@ -192,6 +194,8 @@ int test(int nargs, char **args) {
 		char *my_args[4];  
 		int priority =random_in_range(1, priority_levels);
 		double cpu_time =random_in_range((int) min_cpu_time, (int) max_cpu_time);
+
+		// priority is the int
 		char priority_string [5];
 		sprintf(priority_string, "%ld" , priority);
 
