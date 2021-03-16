@@ -55,6 +55,10 @@ void fill_job_details(struct job* completed_job);
 int get_expected_wait_time();
 void print_policy();
 
+void execute_job_process(struct job executing_job);
+
+void print_job_info(struct job new_job);
+
 // int a[50];
 /*
  *  Command table.
@@ -397,8 +401,8 @@ void *dispatch_function(void *ptr) {
 		}
 		struct job first_job = dequeue();
 		currently_executing = 1;
+		time(&first_job.start_time);
 		running_job = first_job;
-
 		pthread_mutex_unlock(&job_queue_lock);
 		pid_t pid = fork();
 
@@ -498,13 +502,19 @@ void compute_performance_measures() {
 void list_all_jobs() {
 	int count_of_jobs = get_count_elements_in_queue();
 	printf("Total number of jobs in the queue: %d\n", count_of_jobs);
-	if (!queue_empty() || running_job.id != -1) {
-		printf("--------------------------------------------------------\n");
-		printf("Name\tCPU_Time\tPri\tArrival_time\tProgress\n");
-		printf("--------------------------------------------------------\n");
+	if (!queue_empty() || running_job.id != -1 || completed_job_index != 0) {
+		printf("-------------------------------------------------------------------------\n");
+		printf("Name\tCPU_Time\tPri\tArrival_time\tStart_time\tProgress\n");
+		printf("-------------------------------------------------------------------------\n");
+		int completed_counter = 0;
+		while(completed_counter < completed_job_index) {
+			print_job_info(completed_jobs[completed_counter]);
+			printf("\tCompleted\n");
+			completed_counter++;
+		}
 		if (running_job.id != -1) {
 			print_job_info(running_job);
-			printf("\tRun\n");
+			printf("\tRunning\n");
 		}
 		int i = tail;
 		int j = 0;
@@ -546,6 +556,39 @@ void update_policy(Policy policy) {
 		change_queue_to_priority(temp_jobs, elements_in_queue);
 		break;
 	}
+}
+
+void print_job_info(struct job new_job){
+	printf("%s\t",new_job.job_name);
+	printf("%4.2f\t\t",new_job.cpu_time);
+	printf("%d\t",new_job.priority);
+	char* arrive_time = ctime(&new_job.arrival_time);
+	arrive_time[strlen(arrive_time)-5] = '\0';
+	printf("%s\t",arrive_time+11);
+
+	// check if did not start yet, to handle jobs that still 
+	// don't have a start time
+	time_t reference_time = time(0);
+	double difference = difftime(reference_time, new_job.start_time);
+	if ( difference > 16158531 ){
+		printf("  [NA]");
+	} else {
+		char* start_time = ctime(&new_job.start_time);
+		start_time[strlen(start_time)-5] = '\0';
+		printf("%s",start_time+11);
+	}
+
+}
+
+void execute_job_process(struct job executing_job) {
+	float cpu_time = executing_job.cpu_time;
+	char float_in_string[10];
+	gcvt(cpu_time, 4, float_in_string);
+	char *my_args[3];  
+  	my_args[0] = "./job_process";
+  	my_args[1] = float_in_string;
+  	my_args[2] = NULL;
+  	execv("./job_process", my_args);
 }
 
 void change_queue_to_fcfs(struct job temp_jobs[], int count) {
