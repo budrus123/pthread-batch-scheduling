@@ -4,62 +4,91 @@
 #include <assert.h>
 #include <string.h>
 #include <sys/types.h>
-#include "command_line.h"
 #include <time.h>
+#include "command_line.h"
 #include "job.h"
 #include "policy.h"
 #include "performance.h"
-#include "globals.h"
 
-#define JOB_BUF_SIZE 20
-
-
-/* Error Code */
+#define JOB_BUF_SIZE 50
 #define EINVAL       1
 #define E2BIG        2
-
 #define MAXMENUARGS  9
 #define MAXCMDLINE   64 
 
-int sjf();
-int fcfs();
-int priority();
-int test();
+/*
+* Global variables
+*/
+Policy policy = NONE;
+int policy_change = 0;
+int completed_job_index = 0;
+int currently_executing = 0;
+int head = 0;
+int tail = 0;
 
-void *sched_function( void *ptr ); 
-void *dispatch_function( void *ptr );  
-void *exec_thread_function(void *ptr);
+/*
+* Job queue which is a circular array that 
+* is maintened by the program using a head and
+* tail pointer
+*/
+struct job job_queue[JOB_BUF_SIZE];
+
+/*
+* Array of jobs that are completed
+* The size of the array is 10 times the queue
+* meaning that a person could run up to 500 jobs
+* and store them when completed in this array. (if
+* the queue size was 50)
+*/
+struct job completed_jobs[JOB_BUF_SIZE * 10];
+
+// Variable to tell if the program is in test mode
+int test_mode = 0;
+
+// Global performance info variable
+struct Perf_info performance_metrics;
+
+// Variables to store a newly added job
+// and the current running job
+struct job new_job;
+struct job running_job;
+
+// Mutex to lock the queue
+pthread_mutex_t job_queue_lock; 
+
+// Mutex to lock the completed job queue (array)
+pthread_mutex_t completed_job_queue_lock;
+
+// Mutex to lock the new job variable 
+// so it is only added to the queue after
+// completion of the run command
+pthread_mutex_t new_job_job_lock; 
+
+pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
+pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
+
+// Function prototypes
+int test();
+void *scheduling_module( void *ptr ); 
+void *dispatching_module( void *ptr );  
 void compute_performance_measures();
 void print_performance_measures();
-int queue_full();
-int get_next_position();
 float get_uniform_element(float min, float max, int elements_count, int position);
 void initialize_global_variables();
 void reset_program();
-
-
-struct job dequeue();
-
-struct job enqueue(struct job new_job);
-
-struct Workload_data {
-	int number_of_jobs;
-	float arrival_rate;
-	int min_cpu_time;
-	int max_cpu_time;
-};
-
 float random_in_range(float low, float high);
 void change_queue_to_fcfs(struct job job[], int count);
 void change_queue_to_sjf(struct job job[], int count);
 void change_queue_to_priority(struct job job[], int count);
-void list_all_jobs();
 void update_policy(Policy policy);
-void fill_job_details(struct job* completed_job);
-int get_expected_wait_time();
-void print_policy();
-void execute_job_process(struct job executing_job);
-void print_job_info(struct job new_job);
+void print_intro();
+
+// struct Workload_data {
+// 	int number_of_jobs;
+// 	float arrival_rate;
+// 	int min_cpu_time;
+// 	int max_cpu_time;
+// };
 
 /*
  *  Command table.
@@ -86,57 +115,56 @@ static struct {
 
 };
 
-/*
-* Function to change the scheduling algorithm to
-* FCFS and set a flag that the policy has been
-* changed, so the schedular can reschedle jobs
-* in the queue.
-*/
-
-int fcfs(){
-	pthread_mutex_lock(&job_queue_lock);
-	int count_queue = get_count_elements_in_queue();
-	printf("Scheduling policy is switched to FCFS." 
-		" All the %d waiting jobs have been rescheduled.\n", count_queue);	
-	policy_change = 1;
-	policy = FCFS;
-	pthread_mutex_unlock(&job_queue_lock);
-
+void print_intro() {
+	printf("Type `help` to find more about the supported commands.\n");
 }
 
 /*
-* Function to change the scheduling algorithm to
-* SJF and set a flag that the policy has been
-* changed, so the schedular can reschedle jobs
-* in the queue.
+* Main function
+* Main function creates the threads and runs them
+* it also handles the command from the user.
+* When in test mode, the command is disabled
 */
 
-int sjf(){
-	pthread_mutex_lock(&job_queue_lock);
-	int count_queue = get_count_elements_in_queue();
-	printf("Scheduling policy is switched to SJF." 
-		" All the %d waiting jobs have been rescheduled.\n", count_queue);	
-	policy_change = 1;
-	policy = SJF;
-	pthread_mutex_unlock(&job_queue_lock);
+int main()
+{
+	initialize_global_variables();
+	reset_program();
+	print_intro();
+	char *buffer;
+	size_t bufsize = 64;
+	int  iret1, iret2;
+    pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
+    // printf("[Starting Schedular ]\n");
+	iret1 = pthread_create(&sched_thread, NULL, scheduling_module, NULL);
+	// printf("[Starting Dispatcher]\n");
+	iret2 = pthread_create(&dispatcher_thread, NULL, dispatching_module, NULL);
+
+	pthread_mutex_init(&job_queue_lock, NULL);
+	pthread_mutex_init(&new_job_job_lock, NULL);
+	pthread_mutex_init(&completed_job_queue_lock, NULL);
+	pthread_cond_init(&job_buf_not_full, NULL);
+	pthread_cond_init(&job_buf_not_empty, NULL);
+
+	buffer = (char*) malloc(bufsize * sizeof(char));
+	if (buffer == NULL) {
+		perror("Unable to malloc buffer");
+		exit(1);
+	}
+
+	/*
+ 	* Command line main loop.
+ 	*/
+	while (1) {
+		printf("> [? for menu]: ");
+		getline(&buffer, &bufsize, stdin);
+		cmd_dispatch(buffer);
+		usleep(1000);
+		while (test_mode){}
+	}
+	return 0;
 }
 
-/*
-* Function to change the scheduling algorithm to
-* priority and set a flag that the policy has been
-* changed, so the schedular can reschedle jobs
-* in the queue.
-*/
-
-int priority(){
-	pthread_mutex_lock(&job_queue_lock);
-	int count_queue = get_count_elements_in_queue();
-	printf("Scheduling policy is switched to Priority." 
-		" All the %d waiting jobs have been rescheduled.\n", count_queue);	
-	policy_change = 1;
-	policy = PRIORITY;
-	pthread_mutex_unlock(&job_queue_lock);
-}
 
 /*
  * The quit command.
@@ -294,7 +322,7 @@ int test(int nargs, char **args) {
 		list_all_jobs();
 		usleep(1000);
 	}
-
+	system("clear");
 	printf("\n");
 	list_all_jobs();
 	int count_queue = get_count_elements_in_queue();
@@ -311,6 +339,7 @@ int test(int nargs, char **args) {
 		refresh_counter++;
 	} 
 	system("clear");
+	usleep(10);	
 	list_all_jobs();	
 	time(&performance_metrics.program_end_time);
 	performance_metrics.total_number_of_jobs = completed_job_index;
@@ -411,52 +440,7 @@ void reset_program() {
 }
 
 
-/*
-* Main function
-*/
-int main()
-{
-	initialize_global_variables();
-	reset_program();
-	struct Perf_info c;
-	char *buffer;
-	size_t bufsize = 64;
-	int  iret1, iret2;
-    pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
-    printf("[Starting Schedular ]\n");
-	iret1 = pthread_create(&sched_thread, NULL, sched_function, NULL);
-	printf("[Starting Dispatcher]\n");
-	iret2 = pthread_create(&dispatcher_thread, NULL, dispatch_function, NULL);
-
-	pthread_mutex_init(&job_queue_lock, NULL);
-	pthread_mutex_init(&new_job_job_lock, NULL);
-	pthread_mutex_init(&completed_job_queue_lock, NULL);
-	pthread_cond_init(&job_buf_not_full, NULL);
-	pthread_cond_init(&job_buf_not_empty, NULL);
-
-    // pthread_join(sched_thread, NULL);
-    // pthread_join(dispatcher_thread, NULL); 
-
-	buffer = (char*) malloc(bufsize * sizeof(char));
-	if (buffer == NULL) {
-		perror("Unable to malloc buffer");
-		exit(1);
-	}
-
-	/*
- 	* Command line main loop.
- 	*/
-	while (1) {
-		printf("> [? for menu]: ");
-		getline(&buffer, &bufsize, stdin);
-		cmd_dispatch(buffer);
-		usleep(1000);
-		while (test_mode){}
-	}
-	return 0;
-}
-
-void *sched_function(void *ptr) {
+void *scheduling_module(void *ptr) {
 
 	while (1) {
 		pthread_mutex_lock(&job_queue_lock);
@@ -487,7 +471,7 @@ void *sched_function(void *ptr) {
 				}
 				printf("Expected waiting time: %d\n", get_expected_wait_time());
 				printf("Scheduling policy: ");
-				print_policy();
+				print_policy(policy);
 				printf("\n\n");
 			}
 			new_job.id = -1;
@@ -503,7 +487,7 @@ void *sched_function(void *ptr) {
 
 }
 
-void *dispatch_function(void *ptr) {
+void *dispatching_module(void *ptr) {
 	while(1) {
 		pthread_mutex_lock(&job_queue_lock);
 		while (queue_empty()) {
@@ -547,53 +531,6 @@ void *dispatch_function(void *ptr) {
 
 }
 
-/*
-* Function to print the current set policy.
-*/
-void print_policy() {
-	switch(policy) {
-		case FCFS:
-		printf("FCFS");
-		break;
-		case PRIORITY:
-		printf("PRIORITY");
-		break;
-		case SJF:
-		printf("SJF");
-		break;
-	}
-}
-
-/*
-* Function that gets the expected wait time for a 
-* newly added job. This is done, by 
-* computing the CPU time of all the jobs in the 
-* queue and the currently running job and adding the all up.
-*/
-int get_expected_wait_time() {
-	int expected_time = 0;
-
-	int i = tail;
-	while (i < head - 1) {
-		expected_time += (int) job_queue[i].cpu_time;
-		i++;
-	}
-	if (currently_executing = 1) {
-		expected_time += running_job.cpu_time;
-	}
-	return expected_time;
-}
-
-/*
-* Function that fills the job details, which are
-* the turnaround time and the wait time.
-*/
-
-void fill_job_details(struct job* completed_job) {
-	double difference = difftime((*completed_job).finish_time, (*completed_job).arrival_time);
-	(*completed_job).turnaround_time = difference;
-	(*completed_job).wait_time = (*completed_job).turnaround_time - (*completed_job).cpu_time;
-}
 
 /*
 * Function to print the performance measures.
@@ -646,43 +583,6 @@ void compute_performance_measures() {
 }
 
 /*
-* Function to list all the jobs.
-* This lists all the completed jobs, the currently running job
-* and the jobs waiting in the queue.
-*/
-
-void list_all_jobs() {
-	int count_of_jobs = get_count_elements_in_queue();
-	printf("Total number of jobs in the queue: %d\n", count_of_jobs);
-	if (!queue_empty() || running_job.id != -1 || completed_job_index != 0) {
-		printf("-------------------------------------------------------------------------\n");
-		printf("Name\tCPU_Time\tPri\tArrival_time\tStart_time\tProgress\n");
-		printf("-------------------------------------------------------------------------\n");
-		int completed_counter = 0;
-		while(completed_counter < completed_job_index) {
-			print_job_info(completed_jobs[completed_counter]);
-			printf("\tCompleted\n");
-			completed_counter++;
-		}
-		if (running_job.id != -1) {
-			print_job_info(running_job);
-			printf("\tRunning\n");
-		}
-		int i = tail;
-		int j = 0;
-		while (j < count_of_jobs) {
-			print_job_info(job_queue[i]);
-			printf("\n");
-			i = (i + 1) % JOB_BUF_SIZE;
-			j++;
-		}
-	}
-	else{
-		printf("No jobs pending execution.\n");
-	}
-}
-
-/*
 * Function to update the policy of the elements 
 * in the queue.
 */
@@ -714,52 +614,6 @@ void update_policy(Policy policy) {
 	}
 }
 
-/*
-* Function to print the job info
-* Basically prints all the info of the job
-* in the job struct.
-*/
-
-void print_job_info(struct job new_job){
-	printf("%s\t",new_job.job_name);
-	printf("%4.2f\t\t",new_job.cpu_time);
-	printf("%d\t",new_job.priority);
-	char* arrive_time = ctime(&new_job.arrival_time);
-	arrive_time[strlen(arrive_time)-5] = '\0';
-	printf("%s\t",arrive_time+11);
-
-	// check if did not start yet, to handle jobs that still 
-	// don't have a start time
-	time_t reference_time = time(0);
-	double difference = difftime(reference_time, new_job.start_time);
-	if ( difference > 16158531 ){
-		printf("  [NA]");
-	} else {
-		char* start_time = ctime(&new_job.start_time);
-		start_time[strlen(start_time)-5] = '\0';
-		printf("%s",start_time+11);
-	}
-
-}
-
-/*
-* Function to execute the job process.
-* This function recieves the job process
-* and executes the batch_job process with the 
-* cpu_time as a float so that the batch_job
-* can wait for that amount of time.
-*/
-
-void execute_job_process(struct job executing_job) {
-	float cpu_time = executing_job.cpu_time;
-	char float_in_string[10];
-	gcvt(cpu_time, 4, float_in_string);
-	char *my_args[3];  
-  	my_args[0] = "./batch_job";
-  	my_args[1] = float_in_string;
-  	my_args[2] = NULL;
-  	execv("./batch_job", my_args);
-}
 
 /*
 * Function that takes an array of jobs, and their count
@@ -850,19 +704,6 @@ void change_queue_to_priority(struct job temp_jobs[], int count) {
 }
 
 /*
-* Function that returns the number of elements in the queue
-*/
-int get_count_elements_in_queue() {
-	if (queue_empty())
-		return 0;
-	if (head > tail) {
-		return head - tail;
-	} else {
-		return JOB_BUF_SIZE - (tail - head);
-	}
-}
-
-/*
  * Process a single command.
  */
 int cmd_dispatch(char *cmd)
@@ -900,54 +741,4 @@ int cmd_dispatch(char *cmd)
 
 	printf("%s: Command not found\n", args[0]);
 	return EINVAL;
-}
-
-/*
-* Function to see if the queue is empty
-* or not.
-*/
-int queue_empty() {
-	return head == tail;
-}
-
-/*
-* Function to see if the queue is full 
-* or not.
-*/
-int queue_full() {
-	int next_position = (head + 1) % JOB_BUF_SIZE;
-	return next_position == tail;
-}
-
-/*
-* Function to get the next available position
-* in the circular queue.
-*/
-int get_next_position() {
-	int next_position = (head + 1) % JOB_BUF_SIZE;
-	return next_position;
-}
-
-/*
-* Function to dequeue a job from the queue
-* and then return.
-*/
-struct job dequeue() {
-	if (!queue_empty()) {
-		struct job tail_job = job_queue[tail];
-		tail = (tail + 1 ) % JOB_BUF_SIZE;
-		return tail_job;
-	}
-}
-
-/*
-* Function that takes a job and then 
-* enqueues (adds) that job to the queue.
-*/
-struct job enqueue(struct job new_job) {
-	if (!queue_full()) {
-		int next_position = get_next_position();
-		job_queue[head] = new_job;
-		head = next_position;
-	}
 }

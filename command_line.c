@@ -12,10 +12,6 @@
  * Department of Computer Science and Software Engineering
  * Auburn University
  *
- * Compilation Instruction:
- * gcc commandline_parser.c -o commandline_parser
- * ./commandline_parser
- *
  */
 
 #include <sys/types.h>
@@ -48,7 +44,7 @@ void showmenu(const char *name, const char *x[])
 	half = (ct+1)/2;
 
 	for (i=0; i<ct; i++) {
-		printf("\t\t%s", x[i]);
+		printf("\t%s", x[i]);
 		printf("\n");
 	}
 
@@ -56,7 +52,7 @@ void showmenu(const char *name, const char *x[])
 }
 
 static const char *helpmenu[] = {
-	"[run]: <name> <time> <priority>       ",
+	"[run]:\trun a certain job. Run <name> <time> <priority>       ",
 	"[list]: List jobs in the queue       ",
 	"[fcfs]: Change scheduling policy to FCFS       ",
 	"[sjf]: Change scheduling policy to SJF       ",
@@ -74,10 +70,11 @@ int cmd_helpmenu(int n, char **a)
 	(void)n;
 	(void)a;
 
-	showmenu("AUbatch help menu:", helpmenu);
+	showmenu("Help menu:", helpmenu);
 	return 0;
 }
 
 void clear_screen() {
 	system("clear");
 }
+

@@ -8,6 +8,12 @@ typedef enum {
 	NONE
 } Policy;
 
-Policy policy = NONE;
-int policy_change = 0;
+extern Policy policy;
+extern int policy_change;
+extern pthread_mutex_t job_queue_lock; 
+
+int sjf();
+int fcfs();
+int priority();
+void print_policy();
 
