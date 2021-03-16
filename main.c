@@ -33,6 +33,8 @@ void compute_performance_measures();
 void print_performance_measures();
 int queue_full();
 int get_next_position();
+float get_uniform_element(float min, float max, int elements_count, int position);
+
 
 struct job dequeue();
 
@@ -198,8 +200,12 @@ int test(int nargs, char **args) {
 	printf("Starting tests....\n");
 	for(i = 0; i < num_of_jobs; i++) {
 		char *my_args[4];  
+		
 		int priority =random_in_range(1, priority_levels);
 		double cpu_time =random_in_range((int) min_cpu_time, (int) max_cpu_time);
+
+		// int priority = (int) get_uniform_element(1, priority_levels, num_of_jobs, i);
+		// float cpu_time = get_uniform_element(min_cpu_time, max_cpu_time, num_of_jobs, i);
 
 		// priority is the int
 		char priority_string [5];
@@ -259,6 +265,14 @@ int test(int nargs, char **args) {
     // exit(0);
 
 	test_mode = 0;
+}
+
+// Function that takes a min number, a max number and the total count of elements
+// and the position of the element we want in a uniform distribution and returns
+// the element amount in that uniform distribution
+float get_uniform_element(float min, float max, int elements_count, int position) {
+	float step = (max - min) / elements_count;
+	return (min + (position * step));
 }
 
 int random_in_range(int low, int high) {
