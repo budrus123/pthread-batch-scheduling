@@ -174,17 +174,45 @@ int list(int nargs, char **args) {
 	list_all_jobs();
 }
 
+
+/*
+* Test function.
+*
+* Function to test the program by taking the folloiwng params,
+* <benchmark> <policy> <num_of_jobs> <arrival_rate> <priority_levels> 
+* <min_cpu_time> <max_cpu_time>.
+*
+* Note here that the benchmark is the dummy batch_job program
+* that will sleep for the given CPU time of the program.
+*
+* For the CPU time and priority levels, a random number in the range of 
+* min_cpu_time and max_cpu_time is generated and used as the CPU time.
+* For priority, the same is done (from the range of 1 until the priority level
+* given).
+*
+* For arrival rate, it controls the flow of jobs. For example, if the arrival
+* rate was 1, this means that each second, exactly one job arrives, so after 
+* each job submission, the test command sleeps for 1 second. If the arrival rate,
+* was less than one second, say 0.1 job/second meaning that each 10 seconds, a single
+* job arrives, then after each job submission, the test command sleeps for 1/arrival_rate.
+* For example, if the arrival rate was 0.1, and 2 jobs were submitted, that means,
+* the program needs 20 seconds to submit both jobs (or 10 since we need 1 sleep in between).
+* After each job submission, the test command will sleep for 10 seconds (inverse of arrival rate).
+*
+* Note that a sepcial variable (flag) called test_mode was used to know
+* when the program is running tests, thus, not printing anything during the tests
+* and also not allowing the user to do anything when tests are running.
+*/
+
 int test(int nargs, char **args) {
-	reset_program();
+
 	if (nargs != 8) {
 		printf("Usage: test <benchmark> <policy> <num_of_jobs> <arrival_rate> <priority_levels>\n"
 			"\t    <min_cpu_time> <max_cpu_time>\n");
 		return EINVAL;
 	}
 	test_mode = 1;
-
 	char* benchmark_name = args[1];
-
 	char* policy_string = args[2];
 	policy_string[strlen(policy_string)] = '\0';
 
@@ -200,6 +228,7 @@ int test(int nargs, char **args) {
 		return -1;
 	}
 
+	reset_program();
 	time(&performance_metrics.program_start_time);
 	int num_of_jobs = atoi(args[3]);
 	float arrival_rate = atof(args[4]);
@@ -208,24 +237,30 @@ int test(int nargs, char **args) {
 	float max_cpu_time = atof(args[7]);
 	int i = 0;
 	printf("Starting tests....\n");
+
+	// For loop to submit the jobs,
+	// Jobs are submitted using the 
+	// run command.
 	for(i = 0; i < num_of_jobs; i++) {
 		char *my_args[4];  
 
+		/*
+		* Using random cpu_time and priority within the input range
+		*/
 		int priority = (int) random_in_range(1, priority_levels);
 		float cpu_time =random_in_range(min_cpu_time, max_cpu_time);
 
+		/*
+		* Using uniform cpu_time and priority within the input range
+		* Default is above (random).
+		*/
 		// int priority = (int) get_uniform_element(1, priority_levels, num_of_jobs, i);
 		// float cpu_time = get_uniform_element(min_cpu_time, max_cpu_time, num_of_jobs, i);
 
-		// priority is the int
 		char priority_string [5];
 		sprintf(priority_string, "%ld" , priority);
-
 		char float_in_string[10];
 		gcvt(cpu_time, 4, float_in_string);		
-	  	// my_args[1] = float_in_string;
-
-
 	  	my_args[0] = "run";
 	  	my_args[1] = "test_r";
 	  	my_args[2] = float_in_string;
@@ -243,7 +278,6 @@ int test(int nargs, char **args) {
 		system("clear");
 		list_all_jobs();
 		usleep(1000);
-		
 	}
 
 	printf("\n");
@@ -271,8 +305,6 @@ int test(int nargs, char **args) {
 	compute_performance_measures();
 	print_performance_measures();
 	printf("\n");
-    // exit(0);
-
 	test_mode = 0;
 }
 
@@ -281,6 +313,7 @@ int test(int nargs, char **args) {
 * Function that returns a uniform element in a uniform distribution
 * depending on the min and max and the position of this element.
 */
+
 float get_uniform_element(float min, float max, int elements_count, int position) {
 	float step = (max - min) / elements_count;
 	return (min + (position * step));
@@ -289,9 +322,8 @@ float get_uniform_element(float min, float max, int elements_count, int position
 /*
 * Function that returns a random number in a certain range.
 */
+
 float random_in_range(float low, float high) {
-	// int random = (rand() % (high - low + 1)) + 1;
-	// return random;
 	float scale = rand() / (float) RAND_MAX;
 	float random = low + scale * (high - low);
 	return random;  
