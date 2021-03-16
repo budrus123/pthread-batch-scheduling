@@ -190,7 +190,7 @@ int test(int nargs, char **args) {
 
 	time(&performance_metrics.program_start_time);
 	int num_of_jobs = atoi(args[3]);
-	int arrival_rate = atoi(args[4]);
+	float arrival_rate = atof(args[4]);
 	int priority_levels = atoi(args[5]);
 	float min_cpu_time = atof(args[6]);
 	float max_cpu_time = atof(args[7]);
@@ -215,11 +215,20 @@ int test(int nargs, char **args) {
 	  	my_args[2] = float_in_string;
 	  	my_args[3] = priority_string;
 		cmd_run(4, my_args);
-		if (i % arrival_rate == 0) {
-			sleep(1);
+
+		if (arrival_rate < 1) {
+			double rate_to_seconds = (int) 1 / arrival_rate;
+			sleep((int)rate_to_seconds);
+		} else {
+			if (i % (int) arrival_rate == 0) {
+				sleep(1);
+			}	
 		}
+			system("clear");
+			list_all_jobs();
 		// sleep(1);
 		usleep(1000);
+		
 	}
 
 	printf("\n");
