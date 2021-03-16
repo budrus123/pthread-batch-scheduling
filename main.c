@@ -224,8 +224,8 @@ int test(int nargs, char **args) {
 				sleep(1);
 			}	
 		}
-			system("clear");
-			list_all_jobs();
+		system("clear");
+		list_all_jobs();
 		// sleep(1);
 		usleep(1000);
 		
