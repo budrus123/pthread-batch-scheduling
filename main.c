@@ -58,12 +58,9 @@ void update_policy(Policy policy);
 void fill_job_details(struct job* completed_job);
 int get_expected_wait_time();
 void print_policy();
-
 void execute_job_process(struct job executing_job);
-
 void print_job_info(struct job new_job);
 
-// int a[50];
 /*
  *  Command table.
  */
@@ -72,22 +69,29 @@ static struct {
 	int (*func)(int nargs, char **args);
 } cmdtable[] = {
 	/* commands: single command must end with \n */
-	{ "?\n",	cmd_helpmenu },
-	{ "h\n",	cmd_helpmenu },
-	{ "help\n",	cmd_helpmenu },
-	{ "r",	run_job },
-	{ "run",	run_job },
-	{ "test",	test },
-	{ "list\n",	list },
-	{ "fcfs\n",	fcfs },
-	{ "sjf\n",	sjf },
+	{ "?\n",		cmd_helpmenu },
+	{ "h\n",		cmd_helpmenu },
+	{ "help\n",		cmd_helpmenu },
+	{ "r",			run_job },
+	{ "run",		run_job },
+	{ "test",		test },
+	{ "list\n",		list },
+	{ "fcfs\n",		fcfs },
+	{ "sjf\n",		sjf },
 	{ "priority\n",	priority },
-	{ "q",	cmd_quit },
-	{ "quit",	cmd_quit },
-	{ "clear\n", clear_screen },
+	{ "q",			cmd_quit },
+	{ "quit",		cmd_quit },
+	{ "clear\n", 	clear_screen },
 	{NULL, NULL}
 
 };
+
+/*
+* Function to change the scheduling algorithm to
+* FCFS and set a flag that the policy has been
+* changed, so the schedular can reschedle jobs
+* in the queue.
+*/
 
 int fcfs(){
 	pthread_mutex_lock(&job_queue_lock);
@@ -100,6 +104,13 @@ int fcfs(){
 
 }
 
+/*
+* Function to change the scheduling algorithm to
+* SJF and set a flag that the policy has been
+* changed, so the schedular can reschedle jobs
+* in the queue.
+*/
+
 int sjf(){
 	pthread_mutex_lock(&job_queue_lock);
 	int count_queue = get_count_elements_in_queue();
@@ -109,6 +120,13 @@ int sjf(){
 	policy = SJF;
 	pthread_mutex_unlock(&job_queue_lock);
 }
+
+/*
+* Function to change the scheduling algorithm to
+* priority and set a flag that the policy has been
+* changed, so the schedular can reschedle jobs
+* in the queue.
+*/
 
 int priority(){
 	pthread_mutex_lock(&job_queue_lock);
@@ -155,9 +173,6 @@ int cmd_quit(int nargs, char **args) {
 	}
 
 	time(&performance_metrics.program_end_time);
-	printf("\n--------------------------------------------------------\n");
-	printf("\t\tPerformance info below\n");
-	printf("--------------------------------------------------------\n");
 	performance_metrics.total_number_of_jobs = completed_job_index;
 	compute_performance_measures();
 	print_performance_measures();
@@ -298,9 +313,6 @@ int test(int nargs, char **args) {
 	system("clear");
 	list_all_jobs();	
 	time(&performance_metrics.program_end_time);
-	printf("\n--------------------------------------------------------\n");
-	printf("\t\tPerformance info below\n");
-	printf("--------------------------------------------------------\n");
 	performance_metrics.total_number_of_jobs = completed_job_index;
 	compute_performance_measures();
 	print_performance_measures();
@@ -582,8 +594,11 @@ void fill_job_details(struct job* completed_job) {
 
 }
 void print_performance_measures() {
-	int total_number_of_jobs = performance_metrics.total_number_of_jobs;
 
+	printf("\n--------------------------------------------------------\n");
+	printf("\t\tPerformance info below\n");
+	printf("--------------------------------------------------------\n");
+	int total_number_of_jobs = performance_metrics.total_number_of_jobs;
 	double average_ta = performance_metrics.total_turnaround_time / total_number_of_jobs;
 	double average_cpu = performance_metrics.total_cpu_time / total_number_of_jobs;
 	double average_wait = performance_metrics.total_waiting_time / total_number_of_jobs;
