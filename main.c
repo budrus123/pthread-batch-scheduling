@@ -410,6 +410,10 @@ void reset_program() {
 
 }
 
+
+/*
+* Main function
+*/
 int main()
 {
 	initialize_global_variables();
@@ -498,33 +502,6 @@ void *sched_function(void *ptr) {
 	}
 
 }
-void print_policy() {
-	switch(policy) {
-		case FCFS:
-		printf("FCFS");
-		break;
-		case PRIORITY:
-		printf("PRIORITY");
-		break;
-		case SJF:
-		printf("SJF");
-		break;
-	}
-}
-
-int get_expected_wait_time() {
-	int expected_time = 0;
-
-	int i = tail;
-	while (i < head - 1) {
-		expected_time += (int) job_queue[i].cpu_time;
-		i++;
-	}
-	if (currently_executing = 1) {
-		expected_time += running_job.cpu_time;
-	}
-	return expected_time;
-}
 
 void *dispatch_function(void *ptr) {
 	while(1) {
@@ -570,29 +547,58 @@ void *dispatch_function(void *ptr) {
 
 }
 
+/*
+* Function to print the current set policy.
+*/
+void print_policy() {
+	switch(policy) {
+		case FCFS:
+		printf("FCFS");
+		break;
+		case PRIORITY:
+		printf("PRIORITY");
+		break;
+		case SJF:
+		printf("SJF");
+		break;
+	}
+}
+
+/*
+* Function that gets the expected wait time for a 
+* newly added job. This is done, by 
+* computing the CPU time of all the jobs in the 
+* queue and the currently running job and adding the all up.
+*/
+int get_expected_wait_time() {
+	int expected_time = 0;
+
+	int i = tail;
+	while (i < head - 1) {
+		expected_time += (int) job_queue[i].cpu_time;
+		i++;
+	}
+	if (currently_executing = 1) {
+		expected_time += running_job.cpu_time;
+	}
+	return expected_time;
+}
+
+/*
+* Function that fills the job details, which are
+* the turnaround time and the wait time.
+*/
+
 void fill_job_details(struct job* completed_job) {
-
-	// struct tm* timeinfo;
-	// timeinfo = localtime(&completed_job.arrival_time);
-	// printf("local is %s\n",asctime(timeinfo) );
-
-	// printf("filling fillings\n");
-	// char* arrive_time = ctime(&completed_job.arrival_time);
-	// arrive_time[strlen(arrive_time)-1] = '\0';
-	// printf("Job arrived at: %s\n",arrive_time);
-
-	// char* finish_time = ctime(&completed_job.finish_time);
-	// finish_time[strlen(finish_time)-1] = '\0';
-	// // printf("Job finished at: %s\n",finish_time);
-
 	double difference = difftime((*completed_job).finish_time, (*completed_job).arrival_time);
 	(*completed_job).turnaround_time = difference;
 	(*completed_job).wait_time = (*completed_job).turnaround_time - (*completed_job).cpu_time;
-
-	// printf("turnaround_time time is: %f\n",(*completed_job).turnaround_time);
-	// printf("wait time is: %f\n",(*completed_job).wait_time);
-
 }
+
+/*
+* Function to print the performance measures.
+*/
+
 void print_performance_measures() {
 
 	printf("\n--------------------------------------------------------\n");
@@ -610,6 +616,10 @@ void print_performance_measures() {
 	printf("Throughput:\t\t\t%5.2f\n", throughput);
 
 }
+
+/*
+* Function to compute the performance measures
+*/
 
 void compute_performance_measures() {
 	pthread_mutex_lock(&completed_job_queue_lock);
@@ -634,6 +644,12 @@ void compute_performance_measures() {
 	pthread_mutex_unlock(&completed_job_queue_lock);
 
 }
+
+/*
+* Function to list all the jobs.
+* This lists all the completed jobs, the currently running job
+* and the jobs waiting in the queue.
+*/
 
 void list_all_jobs() {
 	int count_of_jobs = get_count_elements_in_queue();
@@ -666,6 +682,10 @@ void list_all_jobs() {
 	}
 }
 
+/*
+* Function to update the policy of the elements 
+* in the queue.
+*/
 void update_policy(Policy policy) {
 	int elements_in_queue = get_count_elements_in_queue();
 	struct job temp_jobs [elements_in_queue];
@@ -694,6 +714,12 @@ void update_policy(Policy policy) {
 	}
 }
 
+/*
+* Function to print the job info
+* Basically prints all the info of the job
+* in the job struct.
+*/
+
 void print_job_info(struct job new_job){
 	printf("%s\t",new_job.job_name);
 	printf("%4.2f\t\t",new_job.cpu_time);
@@ -716,17 +742,29 @@ void print_job_info(struct job new_job){
 
 }
 
+/*
+* Function to execute the job process.
+* This function recieves the job process
+* and executes the batch_job process with the 
+* cpu_time as a float so that the batch_job
+* can wait for that amount of time.
+*/
+
 void execute_job_process(struct job executing_job) {
 	float cpu_time = executing_job.cpu_time;
 	char float_in_string[10];
 	gcvt(cpu_time, 4, float_in_string);
 	char *my_args[3];  
-  	my_args[0] = "./job_process";
+  	my_args[0] = "./batch_job";
   	my_args[1] = float_in_string;
   	my_args[2] = NULL;
-  	execv("./job_process", my_args);
+  	execv("./batch_job", my_args);
 }
 
+/*
+* Function that takes an array of jobs, and their count
+* and sorts them depending on arrival time.
+*/
 void change_queue_to_fcfs(struct job temp_jobs[], int count) {
 
 	int i, j;
@@ -752,6 +790,10 @@ void change_queue_to_fcfs(struct job temp_jobs[], int count) {
 	}
 }
 
+/*
+* Function that takes an array of jobs, and their count
+* and sorts them depending on burst time (SJF).
+*/
 void change_queue_to_sjf(struct job temp_jobs[], int count) {
 	
 	int i, j;
@@ -779,6 +821,10 @@ void change_queue_to_sjf(struct job temp_jobs[], int count) {
 
 }
 
+/*
+* Function that takes an array of jobs, and their count
+* and sorts them depending on priority (higher priority).
+*/
 void change_queue_to_priority(struct job temp_jobs[], int count) {
 	int i, j;
 	for (i = 0; i < count -1 ; i++) {
@@ -803,6 +849,9 @@ void change_queue_to_priority(struct job temp_jobs[], int count) {
 	}
 }
 
+/*
+* Function that returns the number of elements in the queue
+*/
 int get_count_elements_in_queue() {
 	if (queue_empty())
 		return 0;
@@ -853,20 +902,36 @@ int cmd_dispatch(char *cmd)
 	return EINVAL;
 }
 
+/*
+* Function to see if the queue is empty
+* or not.
+*/
 int queue_empty() {
 	return head == tail;
 }
 
+/*
+* Function to see if the queue is full 
+* or not.
+*/
 int queue_full() {
 	int next_position = (head + 1) % JOB_BUF_SIZE;
 	return next_position == tail;
 }
 
+/*
+* Function to get the next available position
+* in the circular queue.
+*/
 int get_next_position() {
 	int next_position = (head + 1) % JOB_BUF_SIZE;
 	return next_position;
 }
 
+/*
+* Function to dequeue a job from the queue
+* and then return.
+*/
 struct job dequeue() {
 	if (!queue_empty()) {
 		struct job tail_job = job_queue[tail];
@@ -875,6 +940,10 @@ struct job dequeue() {
 	}
 }
 
+/*
+* Function that takes a job and then 
+* enqueues (adds) that job to the queue.
+*/
 struct job enqueue(struct job new_job) {
 	if (!queue_full()) {
 		int next_position = get_next_position();
