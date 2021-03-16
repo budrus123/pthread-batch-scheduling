@@ -31,7 +31,7 @@
 /*
  * The run command - submit a job.
  */
-int cmd_run(int nargs, char **args);
+int run_job(int nargs, char **args);
 
 int list(int nargs, char **args);
 /*

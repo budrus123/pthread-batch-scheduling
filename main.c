@@ -34,6 +34,8 @@ void print_performance_measures();
 int queue_full();
 int get_next_position();
 float get_uniform_element(float min, float max, int elements_count, int position);
+void initialize_global_variables();
+void reset_program();
 
 
 struct job dequeue();
@@ -47,7 +49,7 @@ struct Workload_data {
 	int max_cpu_time;
 };
 
-int random_in_range(int low, int high);
+float random_in_range(float low, float high);
 void change_queue_to_fcfs(struct job job[], int count);
 void change_queue_to_sjf(struct job job[], int count);
 void change_queue_to_priority(struct job job[], int count);
@@ -73,8 +75,8 @@ static struct {
 	{ "?\n",	cmd_helpmenu },
 	{ "h\n",	cmd_helpmenu },
 	{ "help\n",	cmd_helpmenu },
-	{ "r",	cmd_run },
-	{ "run",	cmd_run },
+	{ "r",	run_job },
+	{ "run",	run_job },
 	{ "test",	test },
 	{ "list\n",	list },
 	{ "fcfs\n",	fcfs },
@@ -120,7 +122,14 @@ int priority(){
 
 /*
  * The quit command.
+ * The quit command can be used to terminate the program.
+ * There are two modes for the quit command. The first mode
+ * is quitting immediatly, this means that the pending jobs
+ * are dropped and not executed.
+ * The second mode is to wait for the completion of the
+ * pending programs. For this mode use <-d>
  */
+
 int cmd_quit(int nargs, char **args) {
 	if (nargs != 2) {
 		printf("Usage: %s -<quit_mode>\n", args[0]);
@@ -136,6 +145,7 @@ int cmd_quit(int nargs, char **args) {
 		if (count_queue > 0 || running_job.id != -1) {
 			printf("Pending completion of running programs...\n");
 		}
+		// Wait for elements in the queue to all finish
 		while(get_count_elements_in_queue() > 0 || running_job.id != -1) {
 		} 
 	}
@@ -155,22 +165,22 @@ int cmd_quit(int nargs, char **args) {
     exit(0);
 }
 
-
-
+/*
+* The list command.
+* The list command just calls the list all jobs 
+* function that is used throughout the program.
+*/
 int list(int nargs, char **args) {
 	list_all_jobs();
 }
 
 int test(int nargs, char **args) {
+	reset_program();
 	if (nargs != 8) {
 		printf("Usage: test <benchmark> <policy> <num_of_jobs> <arrival_rate> <priority_levels>\n"
 			"\t    <min_cpu_time> <max_cpu_time>\n");
 		return EINVAL;
 	}
-
-	// TODO: make sure to flush all queues
-	// and start from scratch if test is started
-	// with a non-empty state
 	test_mode = 1;
 
 	char* benchmark_name = args[1];
@@ -200,9 +210,9 @@ int test(int nargs, char **args) {
 	printf("Starting tests....\n");
 	for(i = 0; i < num_of_jobs; i++) {
 		char *my_args[4];  
-		
-		int priority =random_in_range(1, priority_levels);
-		double cpu_time =random_in_range((int) min_cpu_time, (int) max_cpu_time);
+
+		int priority = (int) random_in_range(1, priority_levels);
+		float cpu_time =random_in_range(min_cpu_time, max_cpu_time);
 
 		// int priority = (int) get_uniform_element(1, priority_levels, num_of_jobs, i);
 		// float cpu_time = get_uniform_element(min_cpu_time, max_cpu_time, num_of_jobs, i);
@@ -220,7 +230,7 @@ int test(int nargs, char **args) {
 	  	my_args[1] = "test_r";
 	  	my_args[2] = float_in_string;
 	  	my_args[3] = priority_string;
-		cmd_run(4, my_args);
+		run_job(4, my_args);
 
 		if (arrival_rate < 1) {
 			double rate_to_seconds = (int) 1 / arrival_rate;
@@ -232,7 +242,6 @@ int test(int nargs, char **args) {
 		}
 		system("clear");
 		list_all_jobs();
-		// sleep(1);
 		usleep(1000);
 		
 	}
@@ -267,26 +276,46 @@ int test(int nargs, char **args) {
 	test_mode = 0;
 }
 
-// Function that takes a min number, a max number and the total count of elements
-// and the position of the element we want in a uniform distribution and returns
-// the element amount in that uniform distribution
+
+/*
+* Function that returns a uniform element in a uniform distribution
+* depending on the min and max and the position of this element.
+*/
 float get_uniform_element(float min, float max, int elements_count, int position) {
 	float step = (max - min) / elements_count;
 	return (min + (position * step));
 }
 
-int random_in_range(int low, int high) {
-	int random = (rand() % (high - low + 1)) + 1;
-	return random; 
+/*
+* Function that returns a random number in a certain range.
+*/
+float random_in_range(float low, float high) {
+	// int random = (rand() % (high - low + 1)) + 1;
+	// return random;
+	float scale = rand() / (float) RAND_MAX;
+	float random = low + scale * (high - low);
+	return random;  
 }
 
 
-int cmd_run(int nargs, char **args) {
+/*
+* Run job function.
+* Function that takes the 4 arguments needed to run the job.
+* The first argument is the job name string, the second argument,
+* is the CPU time of the job and the last argument is the priority
+* level of that job.
+*/
+
+int run_job(int nargs, char **args) {
 
 	if (nargs != 4) {
 		printf("Usage: run <job_name> <time> <priority>\n");
 		return EINVAL;
 	}
+
+	// Mutex to lock the new_job element
+	// So when it is read in the schedular,
+	// complete veersion is read.
 	pthread_mutex_lock(&new_job_job_lock);
 	char* name = args[1];
 	float cpu_time = atof(args[2]);
@@ -298,29 +327,53 @@ int cmd_run(int nargs, char **args) {
 	new_job.priority = priority;
 	time_t arrival;
 	time(&arrival);
-	// memcopy(new_job.arrival_time, arrival, sizeof(arrival));
 	new_job.arrival_time = arrival;
-	// printf("current time is %s\n",ctime(&new_job.arrival_time));
 	pthread_mutex_unlock(&new_job_job_lock);
-
   	return 0; /* if succeed */
 }
 
 
+/*
+* Initialize golbal variables function.
+* Function to initialize all the golobal variables
+* of the program.
+*/
 
-int main()
-{
+void initialize_global_variables() {
 
 	srand(time(0));
-	time(&performance_metrics.program_start_time);
 	running_job.id = -1;
 	policy_change = -1;
 	policy = FCFS;
+	new_job.id = -1;
+
+}
+
+/*
+* Reset program function.
+* Function used in resetting the main program
+* variables. This resets the queue and the 
+* completed job array.
+*/
+
+void reset_program() {
+
+	head = 0;
+	tail = 0;
+	completed_job_index = 0;
+	currently_executing = 0;
+	time(&performance_metrics.program_start_time);
+
+}
+
+int main()
+{
+	initialize_global_variables();
+	reset_program();
 	struct Perf_info c;
 	char *buffer;
 	size_t bufsize = 64;
 	int  iret1, iret2;
-	new_job.id = -1;
     pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
     printf("[Starting Schedular ]\n");
 	iret1 = pthread_create(&sched_thread, NULL, sched_function, NULL);

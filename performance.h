@@ -6,5 +6,4 @@ struct Perf_info {
 	double total_turnaround_time;
 	int total_number_of_jobs;
 	double throughput;
-	// Averages can be calculated from these
 };
