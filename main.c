@@ -18,7 +18,7 @@
 #define EINVAL       1
 #define E2BIG        2
 
-#define MAXMENUARGS  7
+#define MAXMENUARGS  9
 #define MAXCMDLINE   64 
 
 int sjf();
@@ -160,8 +160,8 @@ int list(int nargs, char **args) {
 }
 
 int test(int nargs, char **args) {
-	if (nargs != 7) {
-		printf("Usage: test <benchmark> <policy> <num_of_jobs> <priority_levels>\n"
+	if (nargs != 8) {
+		printf("Usage: test <benchmark> <policy> <num_of_jobs> <arrival_rate> <priority_levels>\n"
 			"\t    <min_cpu_time> <max_cpu_time>\n");
 		return EINVAL;
 	}
@@ -190,10 +190,12 @@ int test(int nargs, char **args) {
 
 	time(&performance_metrics.program_start_time);
 	int num_of_jobs = atoi(args[3]);
-	int priority_levels = atoi(args[4]);
-	float min_cpu_time = atof(args[5]);
-	float max_cpu_time = atof(args[6]);
+	int arrival_rate = atoi(args[4]);
+	int priority_levels = atoi(args[5]);
+	float min_cpu_time = atof(args[6]);
+	float max_cpu_time = atof(args[7]);
 	int i = 0;
+	printf("Starting tests....\n");
 	for(i = 0; i < num_of_jobs; i++) {
 		char *my_args[4];  
 		int priority =random_in_range(1, priority_levels);
@@ -213,6 +215,9 @@ int test(int nargs, char **args) {
 	  	my_args[2] = float_in_string;
 	  	my_args[3] = priority_string;
 		cmd_run(4, my_args);
+		if (i % arrival_rate == 0) {
+			sleep(1);
+		}
 		// sleep(1);
 		usleep(1000);
 	}
@@ -223,9 +228,17 @@ int test(int nargs, char **args) {
 	if (count_queue > 0 || running_job.id != -1) {
 		printf("\nPending completion of running programs...\n");
 	}
+	int refresh_counter = 1;
 	while(get_count_elements_in_queue() > 0 || running_job.id != -1) {
+		if (refresh_counter % 10000000 == 0) {
+			system("clear");
+			list_all_jobs();
+			usleep(10);			
+		}
+		refresh_counter++;
 	} 
-
+	system("clear");
+	list_all_jobs();	
 	time(&performance_metrics.program_end_time);
 	printf("\n--------------------------------------------------------\n");
 	printf("\t\tPerformance info below\n");

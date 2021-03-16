@@ -62,7 +62,7 @@ static const char *helpmenu[] = {
 	"[sjf]: Change scheduling policy to SJF       ",
 	"[priority]: Change scheduling policy to Priority       ",
 	"[clear]: clear the screen       ",
-	"[test]: <benchmark> <policy> <num_of_jobs> <priority_levels> <min_CPU_time> <max_CPU_time>",
+	"[test]: <benchmark> <policy> <num_of_jobs> <arrival_rate> <priority_levels> <min_CPU_time> <max_CPU_time>",
 	"[quit]: -<exit_mode>. Exit mode can be -i or -d                 ",
 	"[help]: Print help menu              ",
         /* Please add more menu options below */
