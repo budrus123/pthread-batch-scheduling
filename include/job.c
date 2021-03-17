@@ -46,10 +46,10 @@ void execute_job_process(struct job executing_job) {
 	char float_in_string[10];
 	gcvt(cpu_time, 4, float_in_string);
 	char *my_args[3];  
-  	my_args[0] = "./batch_job";
+  	my_args[0] = benchmark_name;
   	my_args[1] = float_in_string;
   	my_args[2] = NULL;
-  	execv("./batch_job", my_args);
+  	execv(benchmark_name, my_args);
 }
 
 

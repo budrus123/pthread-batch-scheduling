@@ -52,7 +52,7 @@ void showmenu(const char *name, const char *x[])
 }
 
 static const char *helpmenu[] = {
-	"[run]:\trun a certain job. Run <name> <time> <priority>       ",
+	"[run]: run a certain job. Run <name> <time> <priority>       ",
 	"[list]: List jobs in the queue       ",
 	"[fcfs]: Change scheduling policy to FCFS       ",
 	"[sjf]: Change scheduling policy to SJF       ",

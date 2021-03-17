@@ -25,6 +25,7 @@ int completed_job_index = 0;
 int currently_executing = 0;
 int head = 0;
 int tail = 0;
+char* benchmark_name = "./batch_job";
 
 /*
 * Job queue which is a circular array that 
@@ -82,6 +83,7 @@ void change_queue_to_sjf(struct job job[], int count);
 void change_queue_to_priority(struct job job[], int count);
 void update_policy(Policy policy);
 void print_intro();
+int bacnmark_exisits(char* benchmark_name);
 
 // struct Workload_data {
 // 	int number_of_jobs;
@@ -271,6 +273,14 @@ int test(int nargs, char **args) {
 		return -1;
 	}
 
+	if (!bacnmark_exisits(benchmark_name)) {
+		printf("\nProvided benchmark doesn't exisit. Check `benchmark` directory."
+			"\nExample of available benchmark is `batch_job`.\n\n");
+		test_mode = 0;
+		return -1;
+	}
+
+	// Start the test on a fresh queue and no completed jobs
 	reset_program();
 	time(&performance_metrics.program_start_time);
 	int num_of_jobs = atoi(args[3]);
@@ -346,7 +356,28 @@ int test(int nargs, char **args) {
 	compute_performance_measures();
 	print_performance_measures();
 	printf("\n");
+	// After tests end, reset test mode 
+	// and all the other global vars like the queue
+	// and the completed jobs
 	test_mode = 0;
+	initialize_global_variables();
+	reset_program();
+}
+
+
+int bacnmark_exisits(char* benchmark_name) {
+	char directory[50];
+	char extension[10];
+	strcpy(directory, "benchmark/");
+	strcpy(extension, ".o");
+	strcat(directory, benchmark_name);
+	strcat(directory, extension);
+	FILE *fptr = fopen(directory, "r");
+	if (fptr == NULL) {
+		return 0;
+	}
+	fclose(fptr);
+	return 1;
 }
 
 
