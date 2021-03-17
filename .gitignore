@@ -1,4 +1,4 @@
 *
-include/*.o
 !*.*
+include/*.o
 !*/
