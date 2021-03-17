@@ -42,6 +42,9 @@ void print_job_info(struct job new_job){
 */
 
 void execute_job_process(struct job executing_job) {
+	char benchmark_path [30];
+	strcpy(benchmark_path, "./");
+	strcat(benchmark_path, benchmark_name);
 	float cpu_time = executing_job.cpu_time;
 	char float_in_string[10];
 	gcvt(cpu_time, 4, float_in_string);
@@ -49,7 +52,7 @@ void execute_job_process(struct job executing_job) {
   	my_args[0] = benchmark_name;
   	my_args[1] = float_in_string;
   	my_args[2] = NULL;
-  	execv(benchmark_name, my_args);
+  	execv(benchmark_path, my_args);
 }
 
 

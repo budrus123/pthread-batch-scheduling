@@ -22,7 +22,7 @@ extern int head;
 extern int tail;
 extern int completed_job_index;
 extern int currently_executing;
-extern char* benchmark_name;
+char benchmark_name [30];
 
 extern struct job job_queue[JOB_BUF_SIZE];
 extern struct job completed_jobs[JOB_BUF_SIZE * 10];

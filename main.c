@@ -25,7 +25,7 @@ int completed_job_index = 0;
 int currently_executing = 0;
 int head = 0;
 int tail = 0;
-char* benchmark_name = "./batch_job";
+char benchmark_name [30];
 
 /*
 * Job queue which is a circular array that 
@@ -227,8 +227,9 @@ int list(int nargs, char **args) {
 * <benchmark> <policy> <num_of_jobs> <arrival_rate> <priority_levels> 
 * <min_cpu_time> <max_cpu_time>.
 *
-* Note here that the benchmark is the dummy batch_job program
-* that will sleep for the given CPU time of the program.
+* Note here that the benchmark is called real_job which utilizes the CPU
+* there is also a  dummy batch_job program that will sleep for a certain 
+* amount of time.
 *
 * For the CPU time and priority levels, a random number in the range of 
 * min_cpu_time and max_cpu_time is generated and used as the CPU time.
@@ -257,7 +258,7 @@ int test(int nargs, char **args) {
 		return EINVAL;
 	}
 	test_mode = 1;
-	char* benchmark_name = args[1];
+	char* test_benchmark_name = args[1];
 	char* policy_string = args[2];
 	policy_string[strlen(policy_string)] = '\0';
 
@@ -273,15 +274,17 @@ int test(int nargs, char **args) {
 		return -1;
 	}
 
-	if (!bacnmark_exisits(benchmark_name)) {
+	// Make sure the test benchmark is actually there
+	if (!bacnmark_exisits(test_benchmark_name)) {
 		printf("\nProvided benchmark doesn't exisit. Check `benchmark` directory."
-			"\nExample of available benchmark is `batch_job`.\n\n");
+			"\nExample of available benchmark is `real_job` or `batch_job`.\n\n");
 		test_mode = 0;
 		return -1;
 	}
 
 	// Start the test on a fresh queue and no completed jobs
 	reset_program();
+	strcpy(benchmark_name, test_benchmark_name);
 	time(&performance_metrics.program_start_time);
 	int num_of_jobs = atoi(args[3]);
 	float arrival_rate = atof(args[4]);
@@ -365,6 +368,10 @@ int test(int nargs, char **args) {
 }
 
 
+/*
+* Function to make sure that the benchmark that will execute
+* actually exisits.
+*/
 int bacnmark_exisits(char* benchmark_name) {
 	char directory[50];
 	char extension[10];
@@ -444,7 +451,7 @@ int run_job(int nargs, char **args) {
 */
 
 void initialize_global_variables() {
-
+	strcpy(benchmark_name, "batch_job");
 	srand(time(0));
 	running_job.id = -1;
 	policy_change = -1;
