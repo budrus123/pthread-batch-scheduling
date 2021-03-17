@@ -1,1 +1,1 @@
-# pthread-batch-scheduling
+#  Batch Scheduling using P-Threads
