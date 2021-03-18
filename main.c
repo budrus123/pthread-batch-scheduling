@@ -139,6 +139,8 @@ int main()
 	// printf("[Starting Dispatcher]\n");
 	iret2 = pthread_create(&dispatcher_thread, NULL, dispatching_module, NULL);
 
+	// Initialization of all the mutexes and 
+	// conditonal variables
 	pthread_mutex_init(&job_queue_lock, NULL);
 	pthread_mutex_init(&new_job_job_lock, NULL);
 	pthread_mutex_init(&completed_job_queue_lock, NULL);
@@ -651,6 +653,11 @@ int cmd_dispatch(char *cmd)
 		}
 	}
 
-	printf("%s: Command not found\n", args[0]);
+	// Remove the new line from the entered
+	// command for pritning.
+	char unknown_command [30];
+	strcpy(unknown_command, args[0]);
+	unknown_command[strlen(unknown_command)-1] = '\0';
+	printf("Command [ %s ] not found\n", unknown_command);
 	return EINVAL;
 }
