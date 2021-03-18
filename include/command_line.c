@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include "command_line.h"
 
 /* Error Code */
 #define EINVAL       1
@@ -34,8 +35,6 @@
 void showmenu(const char *name, const char *x[])
 {
 	int ct, half, i;
-
-	printf("\n");
 	printf("%s\n", name);
 	
 	for (i=ct=0; x[i]; i++) {
@@ -52,15 +51,20 @@ void showmenu(const char *name, const char *x[])
 }
 
 static const char *helpmenu[] = {
-	"[run]: run a certain job. Run <name> <time> <priority>       ",
-	"[list]: List jobs in the queue       ",
-	"[fcfs]: Change scheduling policy to FCFS       ",
-	"[sjf]: Change scheduling policy to SJF       ",
-	"[priority]: Change scheduling policy to Priority       ",
-	"[clear]: clear the screen       ",
-	"[test]: <benchmark> <policy> <num_of_jobs> <arrival_rate> <priority_levels> <min_CPU_time> <max_CPU_time>",
-	"[quit]: -<exit_mode>. Exit mode can be -i or -d                 ",
-	"[help]: Print help menu              ",
+	"run <job> <time> <pri>: Submit a job named <job>,\n"
+	"\t\t\t\texecution time <time>,\n\t\t\t\tpriority is <pri>.      ",
+	"test <benchmark> <policy> <num_of_jobs> <arrival_rate>\n"
+	"\t     <priority_levels> <min_CPU_time> <max_CPU_time>\n"
+	"\t     Test the program with the given parameters.",
+	"list:\t\tList jobs in the queue.       ",
+	"fcfs:\t\tChange scheduling policy to FCFS.       ",
+	"sjf:\t\tChange scheduling policy to SJF.       ",
+	"priority:\tChange scheduling policy to Priority.       ",
+	"clear: \t\tClear the screen.       ",
+	"help or ?: \tPrint help menu.              ",
+	"quit -<mode>:\tExit the program with exit mode <mode>,\n"
+	"\t\t\t-<mode> can be -i for immediate termination,"
+	"\n\t\t\tor -d for delayed termination.                ",
         /* Please add more menu options below */
 	NULL
 };
@@ -69,12 +73,12 @@ int cmd_helpmenu(int n, char **a)
 {
 	(void)n;
 	(void)a;
-
+	help_invoked = 1;
 	showmenu("Help menu:", helpmenu);
 	return 0;
 }
 
-void clear_screen() {
+int clear_screen() {
 	system("clear");
 }
 

@@ -27,6 +27,7 @@ int currently_executing = 0;
 int head = 0;
 int tail = 0;
 char benchmark_name [30];
+int help_invoked = 0;
 
 /*
 * Job queue which is a circular array that 
@@ -112,6 +113,7 @@ static struct {
 };
 
 void print_intro() {
+	printf("Pthread-based Batch Scheduling System.\n");
 	printf("Type `help` to find more about the supported commands.\n");
 }
 
@@ -124,6 +126,7 @@ void print_intro() {
 
 int main()
 {
+	system("clear");
 	initialize_global_variables();
 	reset_program();
 	print_intro();
@@ -152,7 +155,12 @@ int main()
  	* Command line main loop.
  	*/
 	while (1) {
-		printf("> [? for menu]: ");
+		// Once the user invokes the help method
+		// stop printing the [? for help]
+		if (help_invoked)
+			printf("> ");
+		else
+			printf("> [? for help]: ");
 		getline(&buffer, &bufsize, stdin);
 		cmd_dispatch(buffer);
 		usleep(1000);
@@ -463,13 +471,16 @@ void initialize_global_variables() {
 */
 
 void reset_program() {
-
+	// help_invoked = 0;
 	head = 0;
 	tail = 0;
 	completed_job_index = 0;
 	currently_executing = 0;
 	time(&performance_metrics.program_start_time);
-
+	performance_metrics.total_waiting_time = 0;
+	performance_metrics.total_cpu_time = 0;
+	performance_metrics.total_turnaround_time = 0;
+	performance_metrics.total_number_of_jobs = 0;
 }
 
 
