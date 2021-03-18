@@ -13,7 +13,9 @@ extern struct job completed_jobs[JOB_BUF_SIZE * 10];
 */
 
 void print_performance_measures() {
-
+	if (completed_job_index == 0) {
+		return;
+	}
 	printf("\n--------------------------------------------------------\n");
 	printf("\t\tPerformance info below\n");
 	printf("--------------------------------------------------------\n");

@@ -62,6 +62,7 @@ static const char *helpmenu[] = {
 	"priority:\tChange scheduling policy to Priority.       ",
 	"clear: \t\tClear the screen.       ",
 	"help or ?: \tPrint help menu.              ",
+	"quit: \t\tExit the program immediatly.              ",
 	"quit -<mode>:\tExit the program with exit mode <mode>,\n"
 	"\t\t\t-<mode> can be -i for immediate termination,"
 	"\n\t\t\tor -d for delayed termination.                ",

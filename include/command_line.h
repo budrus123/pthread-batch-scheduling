@@ -40,6 +40,8 @@ int list(int nargs, char **args);
  * The quit command.
  */
 int cmd_quit(int nargs, char **args);
+int cmd_quit_immediate(int nargs, char **args);
+
 int clear_screen();
 
 /*

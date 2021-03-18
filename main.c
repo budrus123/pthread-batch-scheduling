@@ -105,6 +105,7 @@ static struct {
 	{ "fcfs\n",		fcfs },
 	{ "sjf\n",		sjf },
 	{ "priority\n",	priority },
+	{ "quit\n",		cmd_quit_immediate },
 	{ "q",			cmd_quit },
 	{ "quit",		cmd_quit },
 	{ "clear\n", 	clear_screen },
@@ -171,7 +172,6 @@ int main()
 	return 0;
 }
 
-
 /*
  * The quit command.
  * The quit command can be used to terminate the program.
@@ -213,6 +213,20 @@ int cmd_quit(int nargs, char **args) {
 	printf("\n");
     exit(0);
 }
+
+/*
+* Calling quit with no arguments
+* wll just call the quit in immediate mode.
+*/
+int cmd_quit_immediate(int nargs, char **args) { 
+	char *my_args[2];  
+	char mode [5];
+	strcpy(mode, "-i\n");
+  	my_args[0] = "quit";
+  	my_args[1] = mode;
+	cmd_quit(2, my_args);
+}
+
 
 /*
 * The list command.
@@ -266,6 +280,7 @@ int test(int nargs, char **args) {
 	char* policy_string = args[2];
 	policy_string[strlen(policy_string)] = '\0';
 
+	// Check to see which policy was passed
 	if(strcmp(policy_string, "fcfs") == 0) {
 		policy = FCFS;
 	} else if(strcmp(policy_string, "sjf") == 0) {
@@ -327,6 +342,17 @@ int test(int nargs, char **args) {
 	  	my_args[3] = priority_string;
 		run_job(4, my_args);
 
+		/*
+		* Use arrival rate to know when to sleep.
+		* if arrival rate is less than one, take the inverse
+		* and sleep that amount after each job.
+		*
+		* If rate > 1 then after rate multiples of jobs added,
+		* sleep for a second. For example if the rate is 5 jobs/second
+		* then after adding 5, 10, 15, and so on jobs, the program sleeps
+		* for a second.
+		*/
+
 		if (arrival_rate < 1) {
 			double rate_to_seconds = (int) 1 / arrival_rate;
 			sleep((int)rate_to_seconds);
@@ -347,6 +373,8 @@ int test(int nargs, char **args) {
 		printf("\nPending completion of running programs...\n");
 	}
 	int refresh_counter = 1;
+
+	// Refresh function for listing and clearing the screen.
 	while(get_count_elements_in_queue() > 0 || running_job.id != -1) {
 		if (refresh_counter % 10000000 == 0) {
 			system("clear");
