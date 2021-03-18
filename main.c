@@ -15,6 +15,7 @@
 #define E2BIG        2
 #define MAXMENUARGS  9
 #define MAXCMDLINE   64 
+#define NEW_JOB_ID   1 
 
 /*
 * Global variables
@@ -84,13 +85,6 @@ void change_queue_to_priority(struct job job[], int count);
 void update_policy(Policy policy);
 void print_intro();
 int bacnmark_exisits(char* benchmark_name);
-
-// struct Workload_data {
-// 	int number_of_jobs;
-// 	float arrival_rate;
-// 	int min_cpu_time;
-// 	int max_cpu_time;
-// };
 
 /*
  *  Command table.
@@ -434,7 +428,8 @@ int run_job(int nargs, char **args) {
 
 	strcpy(new_job.job_name, name);
 	new_job.cpu_time = cpu_time;
-	new_job.id = 17;
+	// To make sure new job id is not -1
+	new_job.id = NEW_JOB_ID; 
 	new_job.priority = priority;
 	time_t arrival;
 	time(&arrival);
@@ -477,6 +472,25 @@ void reset_program() {
 
 }
 
+
+/*
+* Scheduling module thread.
+* 
+* The scheduling module is in-charge of adding new jobs to the queue
+* as well as updating the queue to reflect scheduling policy changes.
+*
+* New jobs are added to the queue using a variable called 'new_job' that 
+* is set and synchronized with the 'job_run' function/command. Initally,
+* this job id is -1, when a new job is added it is set with a specific ID
+* to let the schedular know that this is a real new job. The schedular 
+* then takes this job and adds it to the queue. After it has been added,
+* it gets reset. Note that the job is added in accordance to the current
+* scheduling policy.
+*
+* In addition, the schedular makes sure that the policy changes are
+* reflected using a policy_change flag to call the needed methods to 
+* sort the queue depending on the policy.
+*/
 
 void *scheduling_module(void *ptr) {
 
@@ -525,6 +539,28 @@ void *scheduling_module(void *ptr) {
 
 }
 
+
+/*
+* Dispatching module thread.
+*
+* The dispatching module is in-charge of taking the ready jobs
+* at the beginning of the job queue and execute them. The dispatching 
+* module first waits for the job_queue to not be empty, then the first 
+* job is retreived from the queue so it can be executed. The start time 
+* for this job is then set. Then a new process, using fork(), is 
+* created to run the batch program.
+*
+* After the child (batch program) has completed, the parent (dispatching module),
+* sets the finish time for this job and it computes all the needed times for this 
+* job, like wait and turn-around time.
+*
+* Note that job execution is carried out by the 'execute_job_process' function
+* in the job.c file.
+*
+* At the end, the job is added to an array of jobs called 'completed_jobs' to
+* keep track of all the completed jobs.
+*/
+
 void *dispatching_module(void *ptr) {
 	while(1) {
 		pthread_mutex_lock(&job_queue_lock);
@@ -560,185 +596,12 @@ void *dispatching_module(void *ptr) {
 			running_job.id = -1;
 			pthread_mutex_lock(&completed_job_queue_lock);
 			completed_jobs[completed_job_index++] = first_job;
-
 			pthread_mutex_unlock(&completed_job_queue_lock);
 			break;
 		}
 		pthread_cond_signal(&job_buf_not_full);
 	}
 
-}
-
-
-/*
-* Function to print the performance measures.
-*/
-
-void print_performance_measures() {
-
-	printf("\n--------------------------------------------------------\n");
-	printf("\t\tPerformance info below\n");
-	printf("--------------------------------------------------------\n");
-	int total_number_of_jobs = performance_metrics.total_number_of_jobs;
-	double average_ta = performance_metrics.total_turnaround_time / total_number_of_jobs;
-	double average_cpu = performance_metrics.total_cpu_time / total_number_of_jobs;
-	double average_wait = performance_metrics.total_waiting_time / total_number_of_jobs;
-	double throughput = performance_metrics.throughput;
-	printf("Total number of jobs submitted:\t%5.2f\n", (double)total_number_of_jobs);
-	printf("Average turnaround time:\t%5.2f\n", average_ta);
-	printf("Average CPU time:\t\t%5.2f\n", average_cpu);
-	printf("Average waiting time:\t\t%5.2f\n", average_wait);
-	printf("Throughput:\t\t\t%5.2f\n", throughput);
-
-}
-
-/*
-* Function to compute the performance measures
-*/
-
-void compute_performance_measures() {
-	pthread_mutex_lock(&completed_job_queue_lock);
-	if (completed_job_index == 0) {
-		printf("No jobs have completed, no info to display.\n");
-		return;
-	}
-
-	int total_number_of_jobs = completed_job_index;
-	double sum_turnaround, sum_cpu_time, sum_wait_time;
-	int i = 0;
-	while (i < completed_job_index) {
-		performance_metrics.total_turnaround_time += completed_jobs[i].turnaround_time;
-		performance_metrics.total_cpu_time += completed_jobs[i].cpu_time;
-		performance_metrics.total_waiting_time += completed_jobs[i].wait_time;
-		i++;
-	}
-	time_t end_time = performance_metrics.program_end_time;
-	time_t start_time = performance_metrics.program_start_time;
-
-	performance_metrics.throughput = total_number_of_jobs / (difftime(end_time, start_time));
-	pthread_mutex_unlock(&completed_job_queue_lock);
-
-}
-
-/*
-* Function to update the policy of the elements 
-* in the queue.
-*/
-void update_policy(Policy policy) {
-	int elements_in_queue = get_count_elements_in_queue();
-	struct job temp_jobs [elements_in_queue];
-	int temp_tail = tail;
-	int temp_head = head;
-
-	int i = 0;
-	while (temp_tail < temp_head) {
-		temp_jobs[i] = job_queue[temp_tail];
-		temp_tail = (temp_tail + 1) % JOB_BUF_SIZE;
-		i++;
-	}
-
-	switch (policy){
-		case FCFS:
-		change_queue_to_fcfs(temp_jobs, elements_in_queue);
-		break;
-
-		case SJF:
-		change_queue_to_sjf(temp_jobs, elements_in_queue);
-		break;
-
-		case PRIORITY:
-		change_queue_to_priority(temp_jobs, elements_in_queue);
-		break;
-	}
-}
-
-
-/*
-* Function that takes an array of jobs, and their count
-* and sorts them depending on arrival time.
-*/
-void change_queue_to_fcfs(struct job temp_jobs[], int count) {
-
-	int i, j;
-	for (i = 0; i < count -1 ; i++) {
-		for (j=0; j < count-i-1; j++) {
-			if (temp_jobs[j].arrival_time > temp_jobs[j+1].arrival_time) {
-				//swapping
-				struct job temp = temp_jobs[j];
-				temp_jobs[j] = temp_jobs[j+1];
-				temp_jobs[j+1] = temp;
-			}
-		}
-	}
-
-	int temp_tail = tail;
-	int temp_head = head;
-
-	i = 0;
-	while (temp_tail < temp_head) {
-		job_queue[temp_tail] = temp_jobs[i];
-		temp_tail = (temp_tail + 1) % JOB_BUF_SIZE;
-		i++;
-	}
-}
-
-/*
-* Function that takes an array of jobs, and their count
-* and sorts them depending on burst time (SJF).
-*/
-void change_queue_to_sjf(struct job temp_jobs[], int count) {
-	
-	int i, j;
-	for (i = 0; i < count -1 ; i++) {
-		for (j=0; j < count-i-1; j++) {
-			if (temp_jobs[j].cpu_time > temp_jobs[j+1].cpu_time) {
-				//swapping
-				struct job temp = temp_jobs[j];
-				temp_jobs[j] = temp_jobs[j+1];
-				temp_jobs[j+1] = temp;
-			}
-		}
-	}
-
-	int temp_tail = tail;
-	int temp_head = head;
-
-	i = 0;
-	while (temp_tail < temp_head) {
-		job_queue[temp_tail] = temp_jobs[i];
-		temp_tail = (temp_tail + 1) % JOB_BUF_SIZE;
-		i++;
-	}
-
-
-}
-
-/*
-* Function that takes an array of jobs, and their count
-* and sorts them depending on priority (higher priority).
-*/
-void change_queue_to_priority(struct job temp_jobs[], int count) {
-	int i, j;
-	for (i = 0; i < count -1 ; i++) {
-		for (j=0; j < count-i-1; j++) {
-			if (temp_jobs[j].priority < temp_jobs[j+1].priority) {
-				//swapping
-				struct job temp = temp_jobs[j];
-				temp_jobs[j] = temp_jobs[j+1];
-				temp_jobs[j+1] = temp;
-			}
-		}
-	}
-
-	int temp_tail = tail;
-	int temp_head = head;
-
-	i = 0;
-	while (temp_tail < temp_head) {
-		job_queue[temp_tail] = temp_jobs[i];
-		temp_tail = (temp_tail + 1) % JOB_BUF_SIZE;
-		i++;
-	}
 }
 
 /*
