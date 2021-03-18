@@ -33,8 +33,8 @@ Usage<a name="usage"></a>
 ------------
 
 ```sh
-$ ./main
-$ > [? for menu]: run <job_name> <CPU_time> <priority>
+**$ ./main**
+**$ > [? for menu]:** run <job_name> <CPU_time> <priority>
 ```
 
 
