@@ -17,3 +17,4 @@ int fcfs();
 int priority();
 void print_policy();
 
+

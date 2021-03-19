@@ -79,9 +79,6 @@ float get_uniform_element(float min, float max, int elements_count, int position
 void initialize_global_variables();
 void reset_program();
 float random_in_range(float low, float high);
-void change_queue_to_fcfs(struct job job[], int count);
-void change_queue_to_sjf(struct job job[], int count);
-void change_queue_to_priority(struct job job[], int count);
 void update_policy(Policy policy);
 void print_intro();
 int bacnmark_exisits(char* benchmark_name);

@@ -1,6 +1,10 @@
 #include "policy.h"
 #include "job.h"
 
+void change_queue_to_fcfs(struct job job[], int count);
+void change_queue_to_sjf(struct job job[], int count);
+void change_queue_to_priority(struct job job[], int count);
+
 /*
 * Function to print the current set policy.
 */
@@ -29,8 +33,12 @@ void print_policy() {
 int fcfs(){
 	pthread_mutex_lock(&job_queue_lock);
 	int count_queue = get_count_elements_in_queue();
-	printf("Scheduling policy is switched to FCFS." 
-		" All the %d waiting jobs have been rescheduled.\n", count_queue);	
+	printf("Scheduling policy is switched to FCFS.");
+	if (count_queue > 0) {
+		printf(" All the %d waiting jobs have been rescheduled.\n", count_queue);
+	} else {
+		printf(" No jobs in pending rescheduling.\n");
+	}
 	policy_change = 1;
 	policy = FCFS;
 	pthread_mutex_unlock(&job_queue_lock);
@@ -47,11 +55,17 @@ int fcfs(){
 int sjf(){
 	pthread_mutex_lock(&job_queue_lock);
 	int count_queue = get_count_elements_in_queue();
-	printf("Scheduling policy is switched to SJF." 
-		" All the %d waiting jobs have been rescheduled.\n", count_queue);	
-	policy_change = 1;
+	printf("Scheduling policy is switched to SJF.");
+
+	if (count_queue > 0) {
+		printf(" All the %d waiting jobs have been rescheduled.\n", count_queue);
+	} else {
+		printf(" No jobs in pending rescheduling.\n");
+	}
+		policy_change = 1;
 	policy = SJF;
 	pthread_mutex_unlock(&job_queue_lock);
+	
 }
 
 /*
@@ -64,8 +78,14 @@ int sjf(){
 int priority(){
 	pthread_mutex_lock(&job_queue_lock);
 	int count_queue = get_count_elements_in_queue();
-	printf("Scheduling policy is switched to Priority." 
-		" All the %d waiting jobs have been rescheduled.\n", count_queue);	
+	printf("Scheduling policy is switched to Priority.");
+	if (count_queue > 0) {
+		printf(" All the %d waiting jobs have been rescheduled.\n", count_queue);
+
+	} else {
+		printf(" No jobs in pending rescheduling.\n");
+	}
+
 	policy_change = 1;
 	policy = PRIORITY;
 	pthread_mutex_unlock(&job_queue_lock);
