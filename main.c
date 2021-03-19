@@ -71,7 +71,6 @@ pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
 pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
 
 // Function prototypes
-int test();
 void *scheduling_module( void *ptr ); 
 void *dispatching_module( void *ptr );  
 void compute_performance_measures();
@@ -375,6 +374,7 @@ int test(int nargs, char **args) {
 	int refresh_counter = 1;
 
 	// Refresh function for listing and clearing the screen.
+	// Until all jobs finish.
 	while(get_count_elements_in_queue() > 0 || running_job.id != -1) {
 		if (refresh_counter % 10000000 == 0) {
 			system("clear");

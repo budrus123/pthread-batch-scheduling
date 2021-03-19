@@ -35,14 +35,30 @@ extern int help_invoked;
  */
 int run_job(int nargs, char **args);
 
+/*
+* The list command
+*/
 int list(int nargs, char **args);
+
 /*
  * The quit command.
  */
 int cmd_quit(int nargs, char **args);
+
+/*
+ * The quit immediat command.
+ */
 int cmd_quit_immediate(int nargs, char **args);
 
+/*
+ * The clear screen command.
+ */
 int clear_screen();
+
+/*
+ * The test command.
+ */
+int test();
 
 /*
  * Display menu information
