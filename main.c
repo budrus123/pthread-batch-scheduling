@@ -388,6 +388,7 @@ int test(int nargs, char **args) {
 		}
 		refresh_counter++;
 	} 
+	// printf("done done\n");
 	system("clear");
 	usleep(10);	
 	list_all_jobs();	
@@ -559,12 +560,17 @@ void *scheduling_module(void *ptr) {
 		* schedular will go into idle/sleep mode while the queue is empty
 		* and the user has not added any new jobs. This keeps CPU usage
 		* at a minimum.
+		*
+		* In this case, we also release the job_queue lock
+		* since it will not be needed in idle mode.
 		*/
 
 		pthread_mutex_lock(&new_job_job_lock);
 		while (queue_empty() && new_job.id == -1) {
+			// pthread_mutex_unlock(&job_queue_lock);
 			pthread_cond_wait(&job_buf_not_idle, &new_job_job_lock);
 		}
+		// pthread_mutex_lock(&job_queue_lock);
 		if (new_job.id != -1) {
 			enqueue(new_job);
 			pthread_cond_signal(&job_buf_not_empty);		

@@ -51,21 +51,22 @@ void showmenu(const char *name, const char *x[])
 }
 
 static const char *helpmenu[] = {
-	"run <job> <time> <pri>: Submit a job named <job>,\n"
-	"\t\t\t\texecution time <time>,\n\t\t\t\tpriority is <pri>.      ",
-	"test <benchmark> <policy> <num_of_jobs> <arrival_rate>\n"
-	"\t     <priority_levels> <min_CPU_time> <max_CPU_time>\n"
-	"\t     Test the program with the given parameters.",
-	"list:\t\tList jobs in the queue.       ",
-	"fcfs:\t\tChange scheduling policy to FCFS.       ",
-	"sjf:\t\tChange scheduling policy to SJF.       ",
-	"priority:\tChange scheduling policy to Priority.       ",
-	"clear: \t\tClear the screen.       ",
-	"help or ?: \tPrint help menu.              ",
-	"quit: \t\tExit the program immediatly.              ",
-	"quit -<mode>:\tExit the program with exit mode <mode>,\n"
-	"\t\t\t-<mode> can be -i for immediate termination,"
-	"\n\t\t\tor -d for delayed termination.                ",
+	"run <j> <t> <p>:\tSubmit a job named <j>, CPU time <t> and priority <p>.      ",
+	"test <b> <p> <n> <a>\n"
+	"\t     <l> <min> <max>:\tTest the program with the given parameters.\n"
+	"\t\t\t\twhere <b> is benchmark name, <p> is policy,\n"
+	"\t\t\t\t<n> is num of jobs, <a> is arrival rate,\n"
+	"\t\t\t\t<l> is priority levels, <min> <max> are min/max CPU time.",
+	"list:\t\t\tList jobs in the queue.       ",
+	"fcfs:\t\t\tChange scheduling policy to FCFS.       ",
+	"sjf:\t\t\tChange scheduling policy to SJF.       ",
+	"priority:\t\tChange scheduling policy to Priority.       ",
+	"clear: \t\t\tClear the screen.       ",
+	"help or ?: \t\tPrint help menu.              ",
+	"quit: \t\t\tExit the program immediatly.              ",
+	"quit -m:\t\tExit the program with exit mode m,\n"
+	"\t\t\t\t-m can be -i for immediate termination,"
+	"\n\t\t\t\tor -d for delayed termination.                ",
         /* Please add more menu options below */
 	NULL
 };
