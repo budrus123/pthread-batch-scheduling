@@ -70,6 +70,13 @@ pthread_mutex_t new_job_job_lock;
 pthread_cond_t job_buf_not_full; /* Condition variable for buf_not_full */
 pthread_cond_t job_buf_not_empty; /* Condition variable for buf_not_empty */
 
+/* 
+* Condition to make schedular run only 
+* when there is a new job or the buffer is not empty
+*/
+pthread_cond_t job_buf_not_idle; 
+
+
 // Function prototypes
 void *scheduling_module( void *ptr ); 
 void *dispatching_module( void *ptr );  
@@ -143,6 +150,7 @@ int main()
 	pthread_mutex_init(&completed_job_queue_lock, NULL);
 	pthread_cond_init(&job_buf_not_full, NULL);
 	pthread_cond_init(&job_buf_not_empty, NULL);
+	pthread_cond_init(&job_buf_not_idle, NULL);
 
 	buffer = (char*) malloc(bufsize * sizeof(char));
 	if (buffer == NULL) {
@@ -469,6 +477,9 @@ int run_job(int nargs, char **args) {
 	time_t arrival;
 	time(&arrival);
 	new_job.arrival_time = arrival;
+	// Signaling to the schedular 
+	// in order to wake the thread up
+	pthread_cond_signal(&job_buf_not_idle);		
 	pthread_mutex_unlock(&new_job_job_lock);
   	return 0; /* if succeed */
 }
@@ -481,7 +492,7 @@ int run_job(int nargs, char **args) {
 */
 
 void initialize_global_variables() {
-	strcpy(benchmark_name, "batch_job");
+	strcpy(benchmark_name, "real_job");
 	srand(time(0));
 	running_job.id = -1;
 	policy_change = -1;
@@ -539,7 +550,21 @@ void *scheduling_module(void *ptr) {
 				"Can't add any other jobs.");
 			pthread_cond_wait(&job_buf_not_full, &job_queue_lock);
 		}
+
+		/*
+		* The below check is very crucuial.
+		* To make sure that the schedular is not in an infinite,
+		* loop and going on forever, especially when there are no
+		* jobs in the queue nor has the user added a new job, the 
+		* schedular will go into idle/sleep mode while the queue is empty
+		* and the user has not added any new jobs. This keeps CPU usage
+		* at a minimum.
+		*/
+
 		pthread_mutex_lock(&new_job_job_lock);
+		while (queue_empty() && new_job.id == -1) {
+			pthread_cond_wait(&job_buf_not_idle, &new_job_job_lock);
+		}
 		if (new_job.id != -1) {
 			enqueue(new_job);
 			pthread_cond_signal(&job_buf_not_empty);		
