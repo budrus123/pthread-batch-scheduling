@@ -6,9 +6,9 @@
 
  * [Introduction](#intro)
  * [Main Project Design](#design)
-  * [Scheduling Module](#sched_mod)
-  * [Dispatcher Module](#dispatch_mod)
-  * [Testing Module](#test_mod)
+   * [Scheduling Module](#sched_mod)
+   * [Dispatcher Module](#dispatch_mod)
+   * [Testing Module](#test_mod)
  * [Usage](#usage)
 
 ## INTRODUCTION<a name="intro"></a>
@@ -76,11 +76,15 @@ $ ./main
 
 > **Running different commands**
 ```sh
-$ > [? for menu]: run <j> <time> <priority> # Run a job with name <j> and CPU time <time> and priority <priority>.
-$ > [? for menu]: list # List all completed, running, and pending jobs.
+# Run a job with name <j> and CPU time <time> and priority <priority>.
+$ > [? for menu]: run <j> <time> <priority>
+# List all completed, running, and pending jobs.
+$ > [? for menu]: list
 ```
 
 > **Testing scheduling policies and workloads**
 ```sh
-$ > [? for menu]: test <b> <p> <n> <a> <l> <min> <max> # Test the program with the given parameters. Where <b> is benchmark name, <p> is policy, <n> is number of jobs, <a> is arrival rate, is priority levels, <min> <max> are min/max CPU time.
+# Test the program with the given parameters. Where <b> is benchmark name, <p> is policy, 
+# <n> is number of jobs, <a> is arrival rate, is priority levels, <min> <max> are min/max CPU time.
+$ > [? for menu]: test <b> <p> <n> <a> <l> <min> <max>
 ```
