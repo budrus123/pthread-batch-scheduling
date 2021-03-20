@@ -305,6 +305,13 @@ int test(int nargs, char **args) {
 		return -1;
 	}
 
+	if (get_count_elements_in_queue() > 0 || running_job.id != -1) {
+		printf("Can't start tests with jobs running.\n");
+		printf("Start tests after running jobs complete.\n");
+		test_mode = 0;
+		return -1;
+	}
+
 	// Start the test on a fresh queue and no completed jobs
 	reset_program();
 	strcpy(benchmark_name, test_benchmark_name);
