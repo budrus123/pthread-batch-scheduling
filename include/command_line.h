@@ -66,6 +66,7 @@ int test();
 void showmenu(const char *name, const char *x[]);
 
 int cmd_helpmenu(int n, char **a);
-
+int cmd_helpmenu_option(int n, char **a);
+void show_help_menu_with_text(char * text);
 
 

@@ -44,6 +44,7 @@ void compute_performance_measures() {
 	}
 
 	int total_number_of_jobs = completed_job_index;
+	performance_metrics.total_number_of_jobs = total_number_of_jobs;
 	double sum_turnaround, sum_cpu_time, sum_wait_time;
 	int i = 0;
 	while (i < completed_job_index) {
