@@ -78,6 +78,7 @@ $ ./main
 ```sh
 # Run a job with name <j> and CPU time <time> and priority <priority>.
 $ > [? for menu]: run <j> <time> <priority>
+$
 # List all completed, running, and pending jobs.
 $ > [? for menu]: list
 ```
