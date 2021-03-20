@@ -249,8 +249,8 @@ int list(int nargs, char **args) {
 * <benchmark> <policy> <num_of_jobs> <arrival_rate> <priority_levels> 
 * <min_cpu_time> <max_cpu_time>.
 *
-* Note here that the benchmark is called real_job which utilizes the CPU
-* there is also a  dummy batch_job program that will sleep for a certain 
+* Note here that the benchmark is called batch_job which utilizes the CPU
+* there is also a  dummy sleep_job program that will sleep for a certain 
 * amount of time.
 *
 * For the CPU time and priority levels, a random number in the range of 
@@ -300,7 +300,7 @@ int test(int nargs, char **args) {
 	// Make sure the test benchmark is actually there
 	if (!bacnmark_exisits(test_benchmark_name)) {
 		printf("\nProvided benchmark doesn't exisit. Check `benchmark` directory."
-			"\nExample of available benchmark is `real_job` or `batch_job`.\n\n");
+			"\nExample of available benchmark is `batch_job` or `sleep_job`.\n\n");
 		test_mode = 0;
 		return -1;
 	}
@@ -493,7 +493,7 @@ int run_job(int nargs, char **args) {
 */
 
 void initialize_global_variables() {
-	strcpy(benchmark_name, "real_job");
+	strcpy(benchmark_name, "batch_job");
 	srand(time(0));
 	running_job.id = -1;
 	policy_change = -1;
