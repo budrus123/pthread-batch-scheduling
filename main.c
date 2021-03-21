@@ -148,9 +148,9 @@ int main()
 	pthread_cond_init(&job_buf_not_full, NULL);
 	pthread_cond_init(&job_buf_not_empty, NULL);
 	pthread_cond_init(&job_buf_not_idle, NULL);
-
-    pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
-    // printf("[Starting Schedular ]\n");
+	
+	pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
+	// printf("[Starting Schedular ]\n");
 	iret1 = pthread_create(&sched_thread, NULL, scheduling_module, NULL);
 	// printf("[Starting Dispatcher]\n");
 	iret2 = pthread_create(&dispatcher_thread, NULL, dispatching_module, NULL);
