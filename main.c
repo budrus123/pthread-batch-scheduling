@@ -139,11 +139,6 @@ int main()
 	char *buffer;
 	size_t bufsize = 64;
 	int  iret1, iret2;
-    pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
-    // printf("[Starting Schedular ]\n");
-	iret1 = pthread_create(&sched_thread, NULL, scheduling_module, NULL);
-	// printf("[Starting Dispatcher]\n");
-	iret2 = pthread_create(&dispatcher_thread, NULL, dispatching_module, NULL);
 
 	// Initialization of all the mutexes and 
 	// conditonal variables
@@ -153,6 +148,24 @@ int main()
 	pthread_cond_init(&job_buf_not_full, NULL);
 	pthread_cond_init(&job_buf_not_empty, NULL);
 	pthread_cond_init(&job_buf_not_idle, NULL);
+
+    pthread_t sched_thread, dispatcher_thread; /* Two concurrent threads */
+    // printf("[Starting Schedular ]\n");
+	iret1 = pthread_create(&sched_thread, NULL, scheduling_module, NULL);
+	// printf("[Starting Dispatcher]\n");
+	iret2 = pthread_create(&dispatcher_thread, NULL, dispatching_module, NULL);
+
+	if (iret1 != 0 || iret2 != 0) {
+		printf("Thread creation failed\n");
+		exit(0);
+	}
+
+	/*
+	* Since threads are not used in a joinable state
+	* threads will be detached as soon as they are created.
+	*/
+	pthread_detach(sched_thread);
+	pthread_detach(dispatcher_thread);
 
 	buffer = (char*) malloc(bufsize * sizeof(char));
 	if (buffer == NULL) {
@@ -240,7 +253,9 @@ int cmd_quit_immediate(int nargs, char **args) {
 * function that is used throughout the program.
 */
 int list(int nargs, char **args) {
+	printf("\n");
 	list_all_jobs();
+	printf("\n");
 }
 
 
@@ -552,7 +567,6 @@ void reset_program() {
 */
 
 void *scheduling_module(void *ptr) {
-
 	while (1) {
 		pthread_mutex_lock(&job_queue_lock);
 		while (queue_full()) {
@@ -575,11 +589,13 @@ void *scheduling_module(void *ptr) {
 		*/
 
 		pthread_mutex_lock(&new_job_job_lock);
+
 		while (queue_empty() && new_job.id == -1) {
-			// pthread_mutex_unlock(&job_queue_lock);
+			pthread_mutex_unlock(&job_queue_lock);
 			pthread_cond_wait(&job_buf_not_idle, &new_job_job_lock);
+			pthread_mutex_lock(&job_queue_lock);
 		}
-		// pthread_mutex_lock(&job_queue_lock);
+
 		if (new_job.id != -1) {
 			enqueue(new_job);
 			pthread_cond_signal(&job_buf_not_empty);		
